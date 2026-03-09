@@ -1,11 +1,4 @@
-import { base44 } from '@/api/base44Client';
 import { Capacitor } from '@capacitor/core';
-
-// Mobile app redirect URI
-export const MOBILE_REDIRECT_URI = 'com.homexlink.app://callback';
-
-// Cache the result to avoid repeated native bridge calls
-let _isNative;
 
 /**
  * Checks if the application is running in a native Capacitor environment
@@ -67,35 +60,4 @@ export const isIOSWebView = () => {
   
   // Check if in webview (not Safari browser, or is standalone PWA)
   return isIOS && (isStandalone || !isSafari);
-};
-
-// Redirect to login with mobile redirect URI
-export const mobileLogin = (nextUrl = null) => {
-  const redirectUri = isMobileApp() 
-    ? MOBILE_REDIRECT_URI 
-    : window.location.origin + (nextUrl || '/dashboard');
-  
-  base44.auth.redirectToLogin(redirectUri);
-};
-
-// Handle mobile authentication callback
-export const handleMobileAuthCallback = async () => {
-  if (!isMobileApp()) return false;
-
-  // Get the URL that opened the app
-  const urlParams = new URLSearchParams(window.location.search);
-  const accessToken = urlParams.get('access_token');
-
-  if (accessToken) {
-    // Set the token in Base44 client
-    await base44.auth.setToken(accessToken);
-    
-    // Redirect to dashboard or intended page
-    const nextUrl = urlParams.get('next') || '/dashboard';
-    window.location.href = nextUrl;
-    
-    return true;
-  }
-
-  return false;
 };

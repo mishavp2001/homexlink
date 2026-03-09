@@ -91,6 +91,60 @@ const MODEL_DEFINITIONS = {
       'last_generated_date', 'createdAt', 'updatedAt'
     ].join(' '),
   },
+  PropertyComponent: {
+    aliases: ['PropertyComponent'],
+    listOperation: 'listPropertyComponents',
+    createOperation: 'createPropertyComponent',
+    updateOperation: 'updatePropertyComponent',
+    deleteOperation: 'deletePropertyComponent',
+    readAccess: 'private',
+    selectionSet: [
+      'id', 'property_id', 'user_email', 'component_type', 'manufacturer', 'model_number', 'serial_number',
+      'install_date', 'condition_rating', 'photo_urls', 'component_data', 'status', 'createdAt', 'updatedAt'
+    ].join(' '),
+  },
+  MaintenanceTask: {
+    aliases: ['MaintenanceTask'],
+    listOperation: 'listMaintenanceTasks',
+    createOperation: 'createMaintenanceTask',
+    updateOperation: 'updateMaintenanceTask',
+    deleteOperation: 'deleteMaintenanceTask',
+    readAccess: 'private',
+    selectionSet: [
+      'id', 'property_id', 'user_email', 'project_title', 'project_description', 'project_type', 'component_type',
+      'urgency', 'preferred_timeline', 'budget_range', 'photo_urls', 'status', 'task_data', 'createdAt', 'updatedAt'
+    ].join(' '),
+  },
+  Report: {
+    aliases: ['Report'],
+    listOperation: 'listReports',
+    createOperation: 'createReport',
+    updateOperation: 'updateReport',
+    deleteOperation: 'deleteReport',
+    readAccess: 'private',
+    selectionSet: 'id property_id user_email report_type report_data status createdAt updatedAt',
+  },
+  SavedDeal: {
+    aliases: ['SavedDeal'],
+    listOperation: 'listSavedDeals',
+    createOperation: 'createSavedDeal',
+    updateOperation: 'updateSavedDeal',
+    deleteOperation: 'deleteSavedDeal',
+    readAccess: 'private',
+    selectionSet: 'id deal_id user_email notes createdAt updatedAt',
+  },
+  Transaction: {
+    aliases: ['Transaction'],
+    listOperation: 'listTransactions',
+    createOperation: 'createTransaction',
+    updateOperation: 'updateTransaction',
+    deleteOperation: 'deleteTransaction',
+    readAccess: 'private',
+    selectionSet: [
+      'id', 'property_id', 'user_email', 'transaction_type', 'category', 'amount', 'date', 'description',
+      'receipt_url', 'payment_method', 'payee', 'payer', 'is_recurring', 'recurring_frequency', 'createdAt', 'updatedAt'
+    ].join(' '),
+  },
 };
 
 const ENTITY_TO_MODEL = Object.fromEntries(
@@ -111,6 +165,181 @@ const getGraphQLClient = () => {
 
 const normalizeError = (message, extra = {}) => Object.assign(new Error(message), extra);
 
+const LEGACY_ACCESS_TOKEN_STORAGE_KEYS = ['base44_access_token', 'token'];
+
+const getLegacyAccessToken = () => {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return token || null;
+  }
+
+  try {
+    for (const storageKey of LEGACY_ACCESS_TOKEN_STORAGE_KEYS) {
+      const storedToken = window.localStorage.getItem(storageKey);
+      if (storedToken) {
+        return storedToken;
+      }
+    }
+  } catch {
+    return token || null;
+  }
+
+  return token || null;
+};
+
+const hasFileValue = value => typeof File !== 'undefined' && value instanceof File;
+
+const serializeLegacyPayload = (kind, name, data) => {
+  if (typeof data === 'string') {
+    throw normalizeError(`${kind} ${name} must receive an object with named parameters, received: ${data}`);
+  }
+
+  if (typeof FormData !== 'undefined' && data instanceof FormData) {
+    return { body: data, contentType: null };
+  }
+
+  if (data && typeof data === 'object' && Object.values(data).some(value => hasFileValue(value))) {
+    const formData = new FormData();
+    Object.keys(data).forEach(key => {
+      const value = data[key];
+      if (hasFileValue(value)) {
+        formData.append(key, value, value.name);
+      } else if (typeof value === 'object' && value !== null) {
+        formData.append(key, JSON.stringify(value));
+      } else {
+        formData.append(key, value);
+      }
+    });
+    return { body: formData, contentType: null };
+  }
+
+  return {
+    body: data === undefined ? undefined : JSON.stringify(data),
+    contentType: 'application/json',
+  };
+};
+
+const parseLegacyResponseBody = async response => {
+  const responseText = await response.text();
+  if (!responseText) {
+    return null;
+  }
+
+  const responseContentType = response.headers.get('content-type') || '';
+  if (responseContentType.includes('application/json')) {
+    try {
+      return JSON.parse(responseText);
+    } catch {
+      return responseText;
+    }
+  }
+
+  return responseText;
+};
+
+const getLegacyErrorMessage = (payload, fallbackMessage) => {
+  if (typeof payload === 'string' && payload) {
+    return payload;
+  }
+
+  if (payload && typeof payload === 'object') {
+    if (typeof payload.message === 'string' && payload.message) {
+      return payload.message;
+    }
+    if (typeof payload.detail === 'string' && payload.detail) {
+      return payload.detail;
+    }
+    if (typeof payload.error === 'string' && payload.error) {
+      return payload.error;
+    }
+  }
+
+  return fallbackMessage;
+};
+
+const getLegacyApiUrl = path => `${String(serverUrl).replace(/\/$/, '')}/api${path}`;
+
+const requestLegacyApi = async ({ path, data, kind, name, includeFunctionsVersion = false, unavailableMessage }) => {
+  if (!hasLegacyBase44Config) {
+    throw normalizeError(unavailableMessage);
+  }
+
+  const { body, contentType } = serializeLegacyPayload(kind, name, data);
+  const headers = {
+    Accept: 'application/json',
+    'X-App-Id': String(appId),
+  };
+
+  if (contentType) {
+    headers['Content-Type'] = contentType;
+  }
+
+  if (includeFunctionsVersion && functionsVersion) {
+    headers['Base44-Functions-Version'] = functionsVersion;
+  }
+
+  const accessToken = getLegacyAccessToken();
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  if (typeof window !== 'undefined') {
+    headers['X-Origin-URL'] = window.location.href;
+  }
+
+  let response;
+  try {
+    response = await fetch(getLegacyApiUrl(path), {
+      method: 'POST',
+      headers,
+      body,
+    });
+  } catch (error) {
+    throw normalizeError(error?.message || `${kind} ${name} request failed.`, {
+      cause: error,
+    });
+  }
+
+  const responseData = await parseLegacyResponseBody(response);
+  if (!response.ok) {
+    throw normalizeError(getLegacyErrorMessage(responseData, `${kind} ${name} request failed.`), {
+      status: response.status,
+      code: responseData?.code,
+      data: responseData,
+    });
+  }
+
+  return {
+    data: responseData,
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  };
+};
+
+const invokeLegacyFunction = (functionName, data) =>
+  requestLegacyApi({
+    path: `/apps/${appId}/functions/${functionName}`,
+    data,
+    kind: 'Function',
+    name: functionName,
+    includeFunctionsVersion: true,
+    unavailableMessage: `The functions.${String(functionName)} operation is not available in Amplify mode without legacy Base44 runtime configuration.`,
+  });
+
+const getLegacyIntegrationPath = (packageName, endpointName) =>
+  packageName === 'Core'
+    ? `/apps/${appId}/integration-endpoints/Core/${endpointName}`
+    : `/apps/${appId}/integration-endpoints/installable/${packageName}/integration-endpoints/${endpointName}`;
+
+const invokeLegacyIntegration = (packageName, endpointName, data) =>
+  requestLegacyApi({
+    path: getLegacyIntegrationPath(packageName, endpointName),
+    data,
+    kind: 'Integration',
+    name: `${packageName}.${endpointName}`,
+    unavailableMessage: `The integrations.${String(packageName)}.${String(endpointName)} operation is not available in Amplify mode without legacy Base44 runtime configuration.`,
+  });
+
 const ensureLegacyMethod = (group, method, entityName) => {
   const target = entityName ? legacyBase44?.[group]?.[entityName]?.[method] : legacyBase44?.[group]?.[method];
   if (typeof target !== 'function') {
@@ -127,6 +356,57 @@ const callLegacyEntity = (entityName, method, ...args) =>
   ensureLegacyMethod('entities', method, entityName).apply(legacyBase44.entities[entityName], args);
 
 const removeNilValues = input => Object.fromEntries(Object.entries(input || {}).filter(([, value]) => value !== undefined));
+
+const isPlainObject = value => Boolean(value && typeof value === 'object' && !Array.isArray(value));
+
+const cloneJsonObject = value => (isPlainObject(value) ? { ...value } : {});
+
+const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
+
+const COMPONENT_DATA_FIELDS = [
+  'description',
+  'estimated_lifetime_years',
+  'replacement_cost',
+  'residual_value',
+  'maintenance_notes',
+  'ai_insights',
+  'ai_insights_generated_date',
+];
+
+const TASK_DATA_FIELDS = [
+  'component_id',
+  'estimated_cost',
+  'ai_recommendations',
+  'recommendations_generated_date',
+  'sent_to_providers',
+  'ai_generated',
+];
+
+const USER_EMAIL_DEFAULT_MODELS = new Set(['PropertyComponent', 'MaintenanceTask', 'Report', 'SavedDeal', 'Transaction']);
+
+const conditionRatingToLabel = rating => {
+  const numericRating = Number(rating);
+  if (Number.isNaN(numericRating)) {
+    return undefined;
+  }
+  if (numericRating >= 4.5) return 'excellent';
+  if (numericRating >= 3.5) return 'good';
+  if (numericRating >= 2.5) return 'fair';
+  return 'poor';
+};
+
+const conditionLabelToRating = label => {
+  if (label == null || label === '') {
+    return null;
+  }
+
+  return {
+    excellent: 5,
+    good: 4,
+    fair: 3,
+    poor: 2,
+  }[String(label).toLowerCase()] ?? null;
+};
 
 const SORT_FIELD_ALIASES = {
   created_date: 'createdAt',
@@ -207,12 +487,52 @@ const normalizeRecord = (modelName, record) => {
     if (typeof normalized.certifications === 'string') {
       normalized.certifications = normalized.certifications ? [normalized.certifications] : [];
     }
+  } else if (modelName === 'PropertyComponent') {
+    const componentData = cloneJsonObject(normalized.component_data);
+
+    if (normalized.brand == null && normalized.manufacturer != null) {
+      normalized.brand = normalized.manufacturer;
+    }
+    if (normalized.model == null && normalized.model_number != null) {
+      normalized.model = normalized.model_number;
+    }
+    if (normalized.installation_year == null) {
+      if (componentData.installation_year != null) {
+        normalized.installation_year = componentData.installation_year;
+      } else if (normalized.install_date) {
+        const parsedYear = Number.parseInt(String(normalized.install_date).slice(0, 4), 10);
+        if (!Number.isNaN(parsedYear)) {
+          normalized.installation_year = parsedYear;
+        }
+      }
+    }
+    if (normalized.current_condition == null) {
+      normalized.current_condition = componentData.current_condition || conditionRatingToLabel(normalized.condition_rating);
+    }
+
+    COMPONENT_DATA_FIELDS.forEach(field => {
+      if (normalized[field] == null && componentData[field] !== undefined) {
+        normalized[field] = componentData[field];
+      }
+    });
+  } else if (modelName === 'MaintenanceTask') {
+    const taskData = cloneJsonObject(normalized.task_data);
+    TASK_DATA_FIELDS.forEach(field => {
+      if (normalized[field] == null && taskData[field] !== undefined) {
+        normalized[field] = taskData[field];
+      }
+    });
+  } else if (modelName === 'Report') {
+    const reportData = cloneJsonObject(normalized.report_data);
+    if (normalized.summary == null) {
+      normalized.summary = reportData.summary || reportData.executive_summary;
+    }
   }
 
   return normalized;
 };
 
-const normalizeModelInput = (modelName, input) => {
+const normalizeModelInput = (modelName, input, existingRecord = null) => {
   const normalized = removeNilValues({ ...(input || {}) });
 
   delete normalized.created_date;
@@ -231,6 +551,82 @@ const normalizeModelInput = (modelName, input) => {
         .map(value => value.trim())
         .filter(Boolean);
     }
+  } else if (modelName === 'PropertyComponent') {
+    const componentData = {
+      ...cloneJsonObject(existingRecord?.component_data),
+      ...cloneJsonObject(normalized.component_data),
+    };
+
+    if (hasOwn(normalized, 'brand') && !hasOwn(normalized, 'manufacturer')) {
+      normalized.manufacturer = normalized.brand;
+    }
+    if (hasOwn(normalized, 'model') && !hasOwn(normalized, 'model_number')) {
+      normalized.model_number = normalized.model;
+    }
+
+    if (hasOwn(normalized, 'installation_year')) {
+      const installationYear = normalized.installation_year == null || normalized.installation_year === ''
+        ? null
+        : Number.parseInt(String(normalized.installation_year), 10);
+      normalized.install_date = Number.isNaN(installationYear) || installationYear == null ? null : `${installationYear}-01-01`;
+      componentData.installation_year = Number.isNaN(installationYear) ? null : installationYear;
+      delete normalized.installation_year;
+    }
+
+    if (hasOwn(normalized, 'current_condition')) {
+      componentData.current_condition = normalized.current_condition;
+      if (!hasOwn(normalized, 'condition_rating')) {
+        normalized.condition_rating = conditionLabelToRating(normalized.current_condition);
+      }
+      delete normalized.current_condition;
+    }
+
+    COMPONENT_DATA_FIELDS.forEach(field => {
+      if (hasOwn(normalized, field)) {
+        componentData[field] = normalized[field];
+        delete normalized[field];
+      }
+    });
+
+    delete normalized.brand;
+    delete normalized.model;
+
+    if (Object.keys(componentData).length > 0) {
+      normalized.component_data = componentData;
+    } else {
+      delete normalized.component_data;
+    }
+  } else if (modelName === 'MaintenanceTask') {
+    const taskData = {
+      ...cloneJsonObject(existingRecord?.task_data),
+      ...cloneJsonObject(normalized.task_data),
+    };
+
+    TASK_DATA_FIELDS.forEach(field => {
+      if (hasOwn(normalized, field)) {
+        taskData[field] = normalized[field];
+        delete normalized[field];
+      }
+    });
+
+    if (Object.keys(taskData).length > 0) {
+      normalized.task_data = taskData;
+    } else {
+      delete normalized.task_data;
+    }
+  } else if (modelName === 'Report') {
+    const shouldIncludeReportData = hasOwn(normalized, 'report_data') || hasOwn(normalized, 'summary');
+    if (shouldIncludeReportData) {
+      const reportData = {
+        ...cloneJsonObject(existingRecord?.report_data),
+        ...cloneJsonObject(normalized.report_data),
+      };
+      if (hasOwn(normalized, 'summary')) {
+        reportData.summary = normalized.summary;
+      }
+      normalized.report_data = reportData;
+    }
+    delete normalized.summary;
   }
 
   return normalized;
@@ -427,6 +823,23 @@ const getAmplifyMe = async () => {
   };
 };
 
+const findModelRecordById = async (definition, id) => {
+  const records = await listModelRecords(definition, {
+    filter: toGraphQLFilter({ id }),
+    limit: 1,
+  });
+  return records[0] || null;
+};
+
+const maybeAddCurrentUserEmail = async (modelName, input) => {
+  if (!USER_EMAIL_DEFAULT_MODELS.has(modelName) || input.user_email != null) {
+    return input;
+  }
+
+  const userContext = await resolveUserContext();
+  return userContext.email ? { ...input, user_email: userContext.email } : input;
+};
+
 const upsertAmplifyUserProfile = async input => {
   const definition = getModelDefinition('User');
   const userContext = await resolveUserContext();
@@ -484,9 +897,13 @@ const createEntityAdapter = entityName => {
       if (!(await canUseAmplifyEntity(definition, 'create'))) {
         return callLegacyEntity(entityName, 'create', input);
       }
+      const createInput = normalizeModelInput(
+        definition.modelName,
+        await maybeAddCurrentUserEmail(definition.modelName, input),
+      );
       const created = await graphql({
         query: buildCreateMutation(definition),
-        variables: { input: normalizeModelInput(definition.modelName, input) },
+        variables: { input: createInput },
         authMode: 'userPool',
         operationName: definition.createOperation,
       });
@@ -496,9 +913,12 @@ const createEntityAdapter = entityName => {
       if (!(await canUseAmplifyEntity(definition, 'update'))) {
         return callLegacyEntity(entityName, 'update', id, input);
       }
+      const existingRecord = ['PropertyComponent', 'MaintenanceTask', 'Report'].includes(definition.modelName)
+        ? await findModelRecordById(definition, id)
+        : null;
       const updated = await graphql({
         query: buildUpdateMutation(definition),
-        variables: { input: { id, ...normalizeModelInput(definition.modelName, input) } },
+        variables: { input: { id, ...normalizeModelInput(definition.modelName, input, existingRecord) } },
         authMode: 'userPool',
         operationName: definition.updateOperation,
       });
@@ -614,6 +1034,55 @@ const entities = new Proxy(
   },
 );
 
+const functions = new Proxy(
+  {
+    invoke: (functionName, data) => invokeLegacyFunction(functionName, data),
+  },
+  {
+    get(target, property) {
+      if (property in target) {
+        return target[property];
+      }
+
+      if (typeof property !== 'string' || property === 'then' || property.startsWith('_')) {
+        return undefined;
+      }
+
+      return data => invokeLegacyFunction(property, data);
+    },
+  },
+);
+
+const createIntegrationEndpointProxy = packageName =>
+  new Proxy(
+    {},
+    {
+      get(_target, endpointName) {
+        if (typeof endpointName !== 'string' || endpointName === 'then' || endpointName.startsWith('_')) {
+          return undefined;
+        }
+
+        return async data => {
+          const response = await invokeLegacyIntegration(packageName, endpointName, data);
+          return response.data;
+        };
+      },
+    },
+  );
+
+const integrations = new Proxy(
+  {},
+  {
+    get(_target, packageName) {
+      if (typeof packageName !== 'string' || packageName === 'then' || packageName.startsWith('_')) {
+        return undefined;
+      }
+
+      return createIntegrationEndpointProxy(packageName);
+    },
+  },
+);
+
 const fallbackProxy = groupName =>
   new Proxy(
     {},
@@ -633,8 +1102,8 @@ const fallbackProxy = groupName =>
 export const base44 = {
   auth,
   entities,
-  functions: fallbackProxy('functions'),
-  integrations: fallbackProxy('integrations'),
+  functions,
+  integrations,
   agents: fallbackProxy('agents'),
   appLogs: legacyBase44?.appLogs || {
     logUserInApp: async () => null,

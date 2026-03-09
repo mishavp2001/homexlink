@@ -1,8 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { appParams } from '@/lib/app-params';
-import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
-import { isAmplifyRuntimeEnabled } from '@/lib/amplify-config';
+import { restorePostLoginRedirect } from '@/utils/mobileAuth';
 
 const AuthContext = createContext(null);
 
@@ -19,79 +17,14 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const checkAppState = async () => {
-    try {
-      setIsLoadingPublicSettings(true);
-      setAuthError(null);
+    setIsLoadingPublicSettings(true);
+    setAuthError(null);
+    setAppPublicSettings(null);
 
-      if (isAmplifyRuntimeEnabled) {
-        setAppPublicSettings(null);
-        setIsLoadingPublicSettings(false);
-        await checkUserAuth({ suppressAuthError: true });
-        return;
-      }
-      
-      // First, check app public settings (with token if available)
-      // This will tell us if auth is required, user not registered, etc.
-      const appClient = createAxiosClient({
-        baseURL: `${appParams.serverUrl}/api/apps/public`,
-        headers: {
-          'X-App-Id': appParams.appId
-        },
-        token: appParams.token, // Include token if available
-        interceptResponses: true
-      });
-      
-      try {
-        const publicSettings = await appClient.get(`/prod/public-settings/by-id/${appParams.appId}`);
-        setAppPublicSettings(publicSettings);
-        
-        // If we got the app public settings successfully, check if user is authenticated
-        if (appParams.token) {
-          await checkUserAuth();
-        } else {
-          setIsLoadingAuth(false);
-          setIsAuthenticated(false);
-        }
-        setIsLoadingPublicSettings(false);
-      } catch (appError) {
-        console.error('App state check failed:', appError);
-        
-        // Handle app-level errors
-        if (appError.status === 403 && appError.data?.extra_data?.reason) {
-          const reason = appError.data.extra_data.reason;
-          if (reason === 'auth_required') {
-            setAuthError({
-              type: 'auth_required',
-              message: 'Authentication required'
-            });
-          } else if (reason === 'user_not_registered') {
-            setAuthError({
-              type: 'user_not_registered',
-              message: 'User not registered for this app'
-            });
-          } else {
-            setAuthError({
-              type: reason,
-              message: appError.message
-            });
-          }
-        } else {
-          setAuthError({
-            type: 'unknown',
-            message: appError.message || 'Failed to load app'
-          });
-        }
-        setIsLoadingPublicSettings(false);
-        setIsLoadingAuth(false);
-      }
-    } catch (error) {
-      console.error('Unexpected error:', error);
-      setAuthError({
-        type: 'unknown',
-        message: error.message || 'An unexpected error occurred'
-      });
+    try {
+      await checkUserAuth({ suppressAuthError: true });
+    } finally {
       setIsLoadingPublicSettings(false);
-      setIsLoadingAuth(false);
     }
   };
 
@@ -102,10 +35,10 @@ export const AuthProvider = ({ children }) => {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
       setIsAuthenticated(true);
-      setIsLoadingAuth(false);
+      setAuthError(null);
+      restorePostLoginRedirect();
     } catch (error) {
       console.error('User auth check failed:', error);
-      setIsLoadingAuth(false);
       setIsAuthenticated(false);
       setUser(null);
       
@@ -116,6 +49,8 @@ export const AuthProvider = ({ children }) => {
           message: 'Authentication required'
         });
       }
+    } finally {
+      setIsLoadingAuth(false);
     }
   };
 
@@ -134,7 +69,7 @@ export const AuthProvider = ({ children }) => {
 
   const navigateToLogin = () => {
     // Use the SDK's redirectToLogin method
-    base44.auth.redirectToLogin(window.location.href);
+    return base44.auth.redirectToLogin(window.location.href);
   };
 
   return (

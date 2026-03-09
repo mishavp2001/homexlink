@@ -1,30 +1,73 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { handleMobileAuthCallback } from '../components/MobileAuthHandler';
+import { base44 } from '@/api/base44Client';
+import { restorePostLoginRedirect } from '@/utils/mobileAuth';
+import { createPageUrl } from '@/utils';
 
 export const isPublic = true;
+
+const wait = ms => new Promise(resolve => {
+  window.setTimeout(resolve, ms);
+});
+
+const waitForAuthenticatedSession = async () => {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      if (await base44.auth.isAuthenticated()) {
+        return true;
+      }
+    } catch (error) {
+      console.debug('Waiting for auth session during callback completion:', error);
+    }
+
+    await wait(250);
+  }
+
+  return false;
+};
 
 export default function AuthCallback() {
   const [status, setStatus] = useState('processing');
 
   useEffect(() => {
+    let isMounted = true;
+
     const processCallback = async () => {
       try {
-        const handled = await handleMobileAuthCallback();
-        
-        if (handled) {
-          setStatus('success');
-        } else {
-          // Not a mobile callback, redirect to dashboard
-          window.location.href = '/dashboard';
+        const isAuthenticated = await waitForAuthenticatedSession();
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (!isAuthenticated) {
+          setStatus('error');
+          return;
+        }
+
+        setStatus('success');
+
+        const redirected = restorePostLoginRedirect({
+          fallbackUrl: `${window.location.origin}${createPageUrl('Dashboard')}`,
+          includeLegacyParams: true,
+        });
+
+        if (!redirected) {
+          window.location.assign(createPageUrl('Dashboard'));
         }
       } catch (error) {
         console.error('Auth callback error:', error);
-        setStatus('error');
+        if (isMounted) {
+          setStatus('error');
+        }
       }
     };
 
     processCallback();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (
