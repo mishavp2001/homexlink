@@ -201,7 +201,7 @@ export default function Landing() {
     } else {
       //alert("Not mobile");
       const signupUrl = window.location.origin + createPageUrl('Dashboard') + '?signup=true';
-      base44.auth.redirectToLogin(signupUrl);
+      base44.auth.redirectToAppLogin(signupUrl);
     }
   };
 
@@ -1411,7 +1411,7 @@ Provide a helpful response with quotes when relevant.`;
       '&name=' + encodeURIComponent(profileData.business_name) +
       '&email=' + encodeURIComponent(profileData.email);
 
-      base44.auth.redirectToLogin(signupUrl);
+      base44.auth.redirectToAppLogin(signupUrl);
     } catch (error) {
       console.error('Error:', error);
       alert('An error occurred. Please try again.');
@@ -1837,7 +1837,7 @@ function PropertyCaptureModalContent({ initialAddress, onClose }) {
 
   const handleLogin = () => {
     const dashboardUrl = window.location.origin + createPageUrl('Dashboard');
-    base44.auth.redirectToLogin(dashboardUrl);
+    navigateToLogin(dashboardUrl);
   };
 
   if (checking) {

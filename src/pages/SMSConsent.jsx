@@ -58,7 +58,7 @@ export default function SMSConsent() {
 
     if (!user) {
       setError('Please sign in to manage SMS notifications');
-      base44.auth.redirectToLogin(window.location.href);
+      base44.auth.redirectToAppLogin(window.location.href);
       return;
     }
 
@@ -244,7 +244,7 @@ export default function SMSConsent() {
                 <div className="text-center py-8">
                   <p className="text-gray-600 mb-4">Please sign in to manage SMS notifications</p>
                   <Button
-                    onClick={() => base44.auth.redirectToLogin(window.location.href)}
+                    onClick={() => base44.auth.redirectToAppLogin(window.location.href)}
                     className="bg-[#1e3a5f] hover:bg-[#2a4a7f]"
                   >
                     Sign In

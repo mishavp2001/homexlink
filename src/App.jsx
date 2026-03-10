@@ -1,4 +1,5 @@
 import './App.css'
+import { Authenticator } from '@aws-amplify/ui-react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
@@ -10,6 +11,7 @@ import { setupIframeMessaging } from './lib/iframe-messaging';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+import Login from '@/pages/Login';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -22,7 +24,7 @@ const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   : <>{children}</>;
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -48,6 +50,7 @@ const AuthenticatedApp = () => {
   return (
     <LayoutWrapper currentPageName={mainPageKey}>
       <Routes>
+        <Route path="/login" element={<Login />} />
         <Route path="/" element={<MainPage />} />
         {Object.entries(Pages).map(([path, Page]) => (
           <Route key={path} path={`/${path}`} element={<Page />} />
@@ -62,16 +65,18 @@ const AuthenticatedApp = () => {
 function App() {
 
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClientInstance}>
-        <Router>
-          <NavigationTracker />
-          <AuthenticatedApp />
-        </Router>
-        <Toaster />
-        <VisualEditAgent />
-      </QueryClientProvider>
-    </AuthProvider>
+    <Authenticator.Provider>
+      <AuthProvider>
+        <QueryClientProvider client={queryClientInstance}>
+          <Router>
+            <NavigationTracker />
+            <AuthenticatedApp />
+          </Router>
+          <Toaster />
+          <VisualEditAgent />
+        </QueryClientProvider>
+      </AuthProvider>
+    </Authenticator.Provider>
   )
 }
 

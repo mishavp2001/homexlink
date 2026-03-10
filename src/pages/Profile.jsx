@@ -11,7 +11,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { User, Wrench, Plus, Edit2, Loader2, CheckCircle, Briefcase, X, Camera, ExternalLink, DollarSign, Image, QrCode, Trash2, MessageSquare, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
@@ -33,9 +32,6 @@ export default function Profile() {
   const [uploadingWorkPhoto, setUploadingWorkPhoto] = useState(false);
   const [generatingQR, setGeneratingQR] = useState(false);
   const [showSMSOptIn, setShowSMSOptIn] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState('');
-  const [deletingAccount, setDeletingAccount] = useState(false);
   
   const [profileForm, setProfileForm] = useState({
     user_type: 'homeowner',
@@ -176,7 +172,7 @@ export default function Profile() {
       } catch (error) {
         console.error('Not authenticated');
         const profileUrl = window.location.origin + createPageUrl('Profile');
-        base44.auth.redirectToLogin(profileUrl);
+        base44.auth.redirectToAppLogin(profileUrl);
       }
       setLoadingAuth(false);
     };
@@ -462,24 +458,6 @@ export default function Profile() {
     setGeneratingQR(false);
   };
 
-  const handleDeleteAccount = async () => {
-    if (deleteConfirmText !== 'DELETE') {
-      alert('Please type DELETE to confirm account deletion');
-      return;
-    }
-
-    setDeletingAccount(true);
-    try {
-      await base44.functions.invoke('deleteAccount');
-      alert('Your account and all data have been permanently deleted.');
-      base44.auth.logout(window.location.origin + createPageUrl('Landing'));
-    } catch (error) {
-      console.error('Failed to delete account:', error);
-      alert('Failed to delete account. Please try again or contact support.');
-      setDeletingAccount(false);
-    }
-  };
-
   if (loadingAuth || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex items-center justify-center">
@@ -489,6 +467,7 @@ export default function Profile() {
   }
 
   const publicProfileUrl = `${window.location.origin}/publicprofile?user=${encodeURIComponent(user.email)}`;
+  const deleteAccountSupportHref = `mailto:support@homexrei.com?subject=${encodeURIComponent('Account deletion request')}&body=${encodeURIComponent(`Please delete my HomeXREI account associated with ${user.email}.\n\nI understand this request will permanently remove my account and related data once verified.`)}`;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
@@ -887,17 +866,18 @@ export default function Profile() {
                   <div>
                     <h3 className="text-lg font-bold text-red-900 mb-2">Delete Account</h3>
                     <p className="text-sm text-red-800 mb-4">
-                      Permanently delete your account and all associated data. This action cannot be undone.
-                      All your properties, services, deals, messages, and other data will be permanently removed.
+                      Self-service account deletion is temporarily unavailable during the platform migration.
+                      To request permanent deletion of your account and associated data, contact support from your account email so the request can be verified safely.
                     </p>
-                    <Button
-                      variant="destructive"
-                      onClick={() => setShowDeleteConfirm(true)}
-                      className="bg-red-600 hover:bg-red-700"
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Delete My Account
+                    <Button asChild variant="destructive" className="bg-red-600 hover:bg-red-700">
+                      <a href={deleteAccountSupportHref}>
+                        <AlertTriangle className="w-4 h-4 mr-2" />
+                        Email Support to Delete Account
+                      </a>
                     </Button>
+                    <p className="text-xs text-red-700 mt-3">
+                      Support: <a href="mailto:support@homexrei.com" className="underline">support@homexrei.com</a>
+                    </p>
                   </div>
                 </div>
               </Card>
@@ -1242,77 +1222,6 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* Delete Account Confirmation Dialog */}
-      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <DialogContent className="max-w-md">
-          <div className="p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                <AlertTriangle className="w-6 h-6 text-red-600" />
-              </div>
-              <h2 className="text-2xl font-bold text-red-900">Delete Account?</h2>
-            </div>
-
-            <div className="space-y-4">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <p className="text-sm text-red-900 font-semibold mb-2">This will permanently delete:</p>
-                <ul className="text-sm text-red-800 space-y-1 list-disc list-inside">
-                  <li>Your user account</li>
-                  <li>All your properties and components</li>
-                  <li>All service listings and deals</li>
-                  <li>All messages and reviews</li>
-                  <li>All bookings and offers</li>
-                  <li>All other associated data</li>
-                </ul>
-              </div>
-
-              <div>
-                <Label className="text-red-900 font-semibold mb-2 block">
-                  Type <span className="font-mono bg-red-100 px-2 py-1 rounded">DELETE</span> to confirm
-                </Label>
-                <Input
-                  value={deleteConfirmText}
-                  onChange={(e) => setDeleteConfirmText(e.target.value)}
-                  placeholder="Type DELETE here"
-                  className="border-red-300 focus:border-red-500 focus:ring-red-500"
-                />
-              </div>
-
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowDeleteConfirm(false);
-                    setDeleteConfirmText('');
-                  }}
-                  className="flex-1"
-                  disabled={deletingAccount}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={handleDeleteAccount}
-                  disabled={deleteConfirmText !== 'DELETE' || deletingAccount}
-                  className="flex-1 bg-red-600 hover:bg-red-700"
-                >
-                  {deletingAccount ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Deleting...
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Delete Forever
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

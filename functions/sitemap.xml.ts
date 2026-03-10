@@ -1,8 +1,59 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
+import { listAmplifyPublicItems } from './_amplifyPublicData.ts';
+
+const LIST_DEALS_FOR_SITEMAP = `
+  query ListDealsForSitemap($filter: ModelDealFilterInput, $limit: Int, $nextToken: String) {
+    listDeals(filter: $filter, limit: $limit, nextToken: $nextToken) {
+      items {
+        id
+        location
+        deal_type
+        createdAt
+        updatedAt
+      }
+      nextToken
+    }
+  }
+`;
+
+const LIST_SERVICE_LISTINGS_FOR_SITEMAP = `
+  query ListServiceListingsForSitemap($filter: ModelServiceListingFilterInput, $limit: Int, $nextToken: String) {
+    listServiceListings(filter: $filter, limit: $limit, nextToken: $nextToken) {
+      items {
+        id
+        expert_name
+        business_name
+        createdAt
+        updatedAt
+      }
+      nextToken
+    }
+  }
+`;
+
+const LIST_INSIGHTS_FOR_SITEMAP = `
+  query ListInsightsForSitemap($filter: ModelInsightFilterInput, $limit: Int, $nextToken: String) {
+    listInsights(filter: $filter, limit: $limit, nextToken: $nextToken) {
+      items {
+        id
+        createdAt
+        updatedAt
+      }
+      nextToken
+    }
+  }
+`;
+
+const escapeXml = value =>
+  String(value).replace(/[<>&'\"]/g, character => ({
+    '<': '&lt;',
+    '>': '&gt;',
+    '&': '&amp;',
+    '"': '&quot;',
+    "'": '&apos;',
+  }[character] || character));
 
 Deno.serve(async (req) => {
   try {
-    const base44 = createClientFromRequest(req);
     const origin = new URL(req.url).origin;
 
     // Static pages
@@ -17,36 +68,48 @@ Deno.serve(async (req) => {
     ];
 
     // Fetch active deals
-    const deals = await base44.asServiceRole.entities.Deal.filter({ status: 'active' });
+    const deals = await listAmplifyPublicItems({
+      query: LIST_DEALS_FOR_SITEMAP,
+      rootField: 'listDeals',
+      filter: { status: { eq: 'active' } },
+    });
     const dealUrls = deals.map(deal => {
       const encodedAddress = encodeURIComponent(deal.location || '');
       let path = '/deals';
-      if (deal.deal_type === 'sale') path = `/sale?address=${encodedAddress}`;
+      if (deal.deal_type === 'property_sales' || deal.deal_type === 'sale') path = `/sale?address=${encodedAddress}`;
       else if (deal.deal_type === 'long_term_rent') path = `/rent?address=${encodedAddress}`;
       else if (deal.deal_type === 'short_term_rent') path = `/airbnb?address=${encodedAddress}`;
       
       return {
         url: path,
-        lastmod: deal.updated_date || deal.created_date,
+        lastmod: deal.updatedAt || deal.createdAt,
         priority: '0.7',
         changefreq: 'weekly'
       };
     });
 
     // Fetch active services
-    const services = await base44.asServiceRole.entities.ServiceListing.filter({ status: 'active' });
+    const services = await listAmplifyPublicItems({
+      query: LIST_SERVICE_LISTINGS_FOR_SITEMAP,
+      rootField: 'listServiceListings',
+      filter: { status: { eq: 'active' } },
+    });
     const serviceUrls = services.map(service => ({
-      url: `/service?name=${encodeURIComponent(service.expert_name)}`,
-      lastmod: service.updated_date || service.created_date,
+      url: `/service?name=${encodeURIComponent(service.expert_name || service.business_name || '')}`,
+      lastmod: service.updatedAt || service.createdAt,
       priority: '0.7',
       changefreq: 'weekly'
     }));
 
     // Fetch published insights
-    const insights = await base44.asServiceRole.entities.Insight.filter({ status: 'published' });
+    const insights = await listAmplifyPublicItems({
+      query: LIST_INSIGHTS_FOR_SITEMAP,
+      rootField: 'listInsights',
+      filter: { status: { eq: 'published' } },
+    });
     const insightUrls = insights.map(insight => ({
       url: `/insights#${insight.id}`,
-      lastmod: insight.updated_date || insight.created_date,
+      lastmod: insight.updatedAt || insight.createdAt,
       priority: '0.6',
       changefreq: 'monthly'
     }));
@@ -58,7 +121,7 @@ Deno.serve(async (req) => {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${allUrls.map(page => `  <url>
-    <loc>${origin}${page.url}</loc>
+    <loc>${escapeXml(`${origin}${page.url}`)}</loc>
     ${page.lastmod ? `<lastmod>${new Date(page.lastmod).toISOString().split('T')[0]}</lastmod>` : ''}
     <changefreq>${page.changefreq}</changefreq>
     <priority>${page.priority}</priority>

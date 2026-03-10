@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
+import { buildLoginUrl } from '@/lib/login-route';
 import { restorePostLoginRedirect } from '@/utils/mobileAuth';
 
 const AuthContext = createContext(null);
@@ -67,9 +68,10 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const navigateToLogin = () => {
-    // Use the SDK's redirectToLogin method
-    return base44.auth.redirectToLogin(window.location.href);
+  const navigateToLogin = (nextUrl = null) => {
+    const targetUrl = nextUrl || window.location.href;
+    window.location.assign(buildLoginUrl(targetUrl));
+    return Promise.resolve();
   };
 
   return (

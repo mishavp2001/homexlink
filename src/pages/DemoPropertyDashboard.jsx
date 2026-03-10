@@ -17,7 +17,7 @@ export default function DemoPropertyDashboard() {
 
   const handleGetStarted = () => {
     const signupUrl = window.location.origin + createPageUrl('Dashboard') + '?signup=true';
-    base44.auth.redirectToLogin(signupUrl);
+    base44.auth.redirectToAppLogin(signupUrl);
   };
 
   // Demo Property Data

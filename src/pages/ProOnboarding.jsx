@@ -16,7 +16,7 @@ export default function ProOnboarding() {
         const user = await base44.auth.me();
         if (!user) {
           const currentUrl = window.location.href;
-          base44.auth.redirectToLogin(currentUrl);
+          base44.auth.redirectToAppLogin(currentUrl);
           return;
         }
 

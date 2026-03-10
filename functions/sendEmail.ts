@@ -1,18 +1,12 @@
 /// <reference lib="deno.ns" />
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
 import { Resend } from 'npm:resend@3.2.0';
+import { requireAmplifyUser, toErrorResponse } from './_amplifyAuth.ts';
 
 const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 
 Deno.serve(async (req) => {
   try {
-    const base44 = createClientFromRequest(req);
-    
-    // Require authentication
-    const user = await base44.auth.me();
-    if (!user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    await requireAmplifyUser(req);
 
     const { to, subject, html, text, from } = await req.json();
 
@@ -36,6 +30,6 @@ Deno.serve(async (req) => {
     return Response.json({ success: true, data });
   } catch (error) {
     console.error('Send email error:', error);
-    return Response.json({ error: error.message }, { status: 500 });
+    return toErrorResponse(error, 'Failed to send email');
   }
 });

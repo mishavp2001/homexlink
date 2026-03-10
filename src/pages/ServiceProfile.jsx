@@ -166,7 +166,7 @@ export default function ServiceProfile() {
 
     if (!currentUser) {
       alert('Please sign in to book this service');
-      base44.auth.redirectToLogin(window.location.href);
+      base44.auth.redirectToAppLogin(window.location.href);
       return;
     }
 
@@ -329,7 +329,7 @@ export default function ServiceProfile() {
   const handleSubmitReview = (reviewData) => {
     if (!currentUser) {
       alert('Please sign in to leave a review');
-      base44.auth.redirectToLogin(window.location.href);
+      base44.auth.redirectToAppLogin(window.location.href);
       return;
     }
 

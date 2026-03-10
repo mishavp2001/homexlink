@@ -1,17 +1,47 @@
 /// <reference lib="deno.ns" />
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
+import { requireAmplifyUser, toErrorResponse } from './_amplifyAuth.ts';
+import { listAmplifyPublicItems } from './_amplifyPublicData.ts';
 import Stripe from 'npm:stripe';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY'));
 
+const FALLBACK_APP_URL = 'https://homexrei.com';
+
+const LIST_DEALS_QUERY = `
+  query ListDeals($filter: ModelDealFilterInput, $limit: Int, $nextToken: String) {
+    listDeals(filter: $filter, limit: $limit, nextToken: $nextToken) {
+      items {
+        id
+        user_email
+        title
+        service_category
+        photo_urls
+        price
+      }
+      nextToken
+    }
+  }
+`;
+
+const resolveAppUrl = (req: Request) => {
+  for (const candidate of [req.headers.get('x-origin-url'), req.headers.get('origin'), req.headers.get('referer')]) {
+    if (!candidate) {
+      continue;
+    }
+
+    try {
+      return new URL(candidate).origin;
+    } catch (error) {
+      console.error('Failed to parse app URL from request header:', candidate, error);
+    }
+  }
+
+  return FALLBACK_APP_URL;
+};
+
 Deno.serve(async (req) => {
   try {
-    const base44 = createClientFromRequest(req);
-    
-    const user = await base44.auth.me();
-    if (!user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const user = await requireAmplifyUser(req);
 
     const { dealId } = await req.json();
     
@@ -19,7 +49,16 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'dealId is required' }, { status: 400 });
     }
 
-    const deals = await base44.asServiceRole.entities.Deal.filter({ id: dealId });
+    if (!user.email) {
+      return Response.json({ error: 'Authenticated user email is required' }, { status: 400 });
+    }
+
+    const deals = await listAmplifyPublicItems({
+      query: LIST_DEALS_QUERY,
+      rootField: 'listDeals',
+      filter: { id: { eq: dealId } },
+      limit: 1,
+    });
     const deal = deals[0];
     
     if (!deal) {
@@ -30,18 +69,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Cannot purchase your own deal' }, { status: 400 });
     }
 
-    // Get the origin from request or referer header
-    const origin = req.headers.get('origin') || req.headers.get('referer');
-    let appUrl = 'https://homexrei.com'; // fallback
-    
-    if (origin) {
-      try {
-        const url = new URL(origin);
-        appUrl = url.origin;
-      } catch (e) {
-        console.error('Failed to parse origin URL:', e);
-      }
-    }
+    const appUrl = resolveAppUrl(req);
     
     console.log('Using app URL for checkout:', appUrl);
     
@@ -73,6 +101,6 @@ Deno.serve(async (req) => {
     return Response.json({ url: session.url });
   } catch (error) {
     console.error('Checkout error:', error);
-    return Response.json({ error: error.message }, { status: 500 });
+    return toErrorResponse(error, 'Failed to create deal checkout session');
   }
 });

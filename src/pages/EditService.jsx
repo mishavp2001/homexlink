@@ -47,7 +47,7 @@ export default function EditService() {
       try {
         const currentUser = await base44.auth.me();
         setUser(currentUser);
-        if (!currentUser) base44.auth.redirectToLogin(window.location.href);
+        if (!currentUser) base44.auth.redirectToAppLogin(window.location.href);
         else if (!serviceId) {
            setServiceForm(prev => ({
              ...prev,
@@ -56,7 +56,7 @@ export default function EditService() {
            }));
         }
       } catch (error) {
-        base44.auth.redirectToLogin(window.location.href);
+        base44.auth.redirectToAppLogin(window.location.href);
       }
     };
     loadUser();

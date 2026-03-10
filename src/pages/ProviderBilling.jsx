@@ -26,7 +26,7 @@ export default function ProviderBilling() {
         setUser(currentUser);
       } catch (error) {
         console.error('Not authenticated', error);
-        base44.auth.redirectToLogin(window.location.origin + createPageUrl('ProviderBilling'));
+        base44.auth.redirectToAppLogin(window.location.origin + createPageUrl('ProviderBilling'));
       }
       setLoadingAuth(false);
     };

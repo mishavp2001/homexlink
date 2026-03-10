@@ -1,5 +1,5 @@
 /// <reference lib="deno.ns" />
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
+import { requireAmplifyUser, toErrorResponse } from './_amplifyAuth.ts';
 import Stripe from 'npm:stripe@14.11.0';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY'), {
@@ -8,13 +8,7 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY'), {
 
 Deno.serve(async (req) => {
   try {
-    const base44 = createClientFromRequest(req);
-    
-    // Verify user is authenticated
-    const user = await base44.auth.me();
-    if (!user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const user = await requireAmplifyUser(req);
 
     const { amount } = await req.json();
     
@@ -30,8 +24,8 @@ Deno.serve(async (req) => {
         enabled: true,
       },
       metadata: {
-        user_id: user.id,
-        user_email: user.email,
+        user_id: user.sub || user.username || user.email || 'unknown',
+        user_email: user.email || '',
       }
     });
 
@@ -41,8 +35,6 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Payment intent error:', error);
-    return Response.json({ 
-      error: error.message || 'Failed to create payment intent' 
-    }, { status: 500 });
+    return toErrorResponse(error, 'Failed to create payment intent');
   }
 });

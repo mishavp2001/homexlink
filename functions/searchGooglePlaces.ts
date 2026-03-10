@@ -1,8 +1,7 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
+/// <reference lib="deno.ns" />
 
 Deno.serve(async (req) => {
   try {
-    const base44 = createClientFromRequest(req);
     const { query, location } = await req.json();
     
     console.log('Searching Google Places:', { query, location });

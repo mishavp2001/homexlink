@@ -55,7 +55,7 @@ export default function MaintenanceProjectModal({ onClose }) {
     if (!profileData.full_name || !profileData.email || !profileData.address) { alert('Please fill in all required fields'); return; }
     setCreating(true);
     const signupUrl = window.location.origin + createPageUrl('Dashboard') + '?signup=true&name=' + encodeURIComponent(profileData.full_name) + '&email=' + encodeURIComponent(profileData.email) + '&phone=' + encodeURIComponent(profileData.phone || '') + '&address=' + encodeURIComponent(profileData.address) + '&project=' + encodeURIComponent(JSON.stringify(projectData));
-    base44.auth.redirectToLogin(signupUrl);
+    base44.auth.redirectToAppLogin(signupUrl);
   };
 
   return (

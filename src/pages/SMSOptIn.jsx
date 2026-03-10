@@ -66,7 +66,7 @@ export default function SMSOptIn() {
       if (!user) {
         // If not logged in, redirect to login
         alert('Please sign in to opt-in to SMS notifications');
-        base44.auth.redirectToLogin(window.location.href);
+        base44.auth.redirectToAppLogin(window.location.href);
         return;
       }
 

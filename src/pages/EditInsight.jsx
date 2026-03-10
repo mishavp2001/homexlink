@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, ArrowLeft, Upload, X, Sparkles, CreditCard } from 'lucide-react';
+import { Loader2, ArrowLeft, Upload, X, CreditCard } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 
 export default function EditInsight() {
@@ -20,7 +20,6 @@ export default function EditInsight() {
   const queryClient = useQueryClient();
   const [user, setUser] = useState(null);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
-  const [generatingImages, setGeneratingImages] = useState(false);
 
   const [insightForm, setInsightForm] = useState({
     title: '',
@@ -54,12 +53,12 @@ export default function EditInsight() {
         const currentUser = await base44.auth.me();
         setUser(currentUser);
         if (!currentUser) {
-           base44.auth.redirectToLogin(window.location.href);
+           base44.auth.redirectToAppLogin(window.location.href);
         } else if (!insightId) {
            setInsightForm(prev => ({ ...prev, author_name: currentUser.full_name || 'Anonymous' }));
         }
       } catch (error) {
-        base44.auth.redirectToLogin(window.location.href);
+        base44.auth.redirectToAppLogin(window.location.href);
       }
     };
     loadUser();
@@ -107,33 +106,6 @@ export default function EditInsight() {
     }
   });
 
-  const generateImagesMutation = useMutation({
-    mutationFn: async () => {
-      const response = await base44.functions.invoke('generateInsightImages', {
-        title: insightForm.title,
-        description: insightForm.content.replace(/<[^>]+>/g, '').substring(0, 200),
-        count: 10
-      });
-
-      if (!response.data?.success) {
-        throw new Error(response.data?.error || 'Failed to generate images');
-      }
-
-      return response.data;
-    },
-    onSuccess: (data) => {
-      setInsightForm(prev => ({
-        ...prev,
-        photo_urls: [...prev.photo_urls, ...data.imageUrls]
-      }));
-      setUser(prev => ({ ...prev, credits: data.creditsRemaining }));
-      alert(`✨ Generated ${data.imagesGenerated} images! ${data.creditsRemaining} credits remaining.`);
-    },
-    onError: (error) => {
-      alert(`Failed to generate images: ${error.message}`);
-    }
-  });
-
   const handlePhotoUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
@@ -157,21 +129,6 @@ export default function EditInsight() {
       ...insightForm,
       photo_urls: insightForm.photo_urls.filter((_, i) => i !== index)
     });
-  };
-
-  const handleGenerateImages = async () => {
-    if (!insightForm.title.trim()) {
-      alert('Please enter a title first');
-      return;
-    }
-
-    const userCredits = user?.credits || 0;
-    if (userCredits < 1) {
-      alert('Insufficient credits. You need 1 credit to generate 10 images.');
-      return;
-    }
-
-    generateImagesMutation.mutate();
   };
 
   const handleSubmit = (e) => {
@@ -289,7 +246,7 @@ export default function EditInsight() {
                   </div>
                 ))}
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <label className="cursor-pointer inline-block">
                   <input
                     type="file"
@@ -304,25 +261,9 @@ export default function EditInsight() {
                     <span>{uploadingPhotos ? 'Uploading...' : 'Upload Photos'}</span>
                   </div>
                 </label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleGenerateImages}
-                  disabled={generateImagesMutation.isPending || !insightForm.title.trim()}
-                  className="border-purple-600 text-purple-700 hover:bg-purple-50"
-                >
-                  {generateImagesMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      AI Generate 10 Images (1 credit)
-                    </>
-                  )}
-                </Button>
+                <p className="text-xs text-gray-500">
+                  Add images by uploading them directly to this insight.
+                </p>
               </div>
             </div>
             <div className="flex gap-2 pt-4">

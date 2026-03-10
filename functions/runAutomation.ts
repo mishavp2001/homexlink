@@ -1,13 +1,12 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
+import { HttpError, requireAmplifyUser } from './_amplifyAuth.ts';
 import puppeteer from 'npm:puppeteer@23.11.1';
 
 Deno.serve(async (req) => {
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    const user = await requireAmplifyUser(req);
 
-    if (!user || user.role !== 'admin') {
-      return Response.json({ error: 'Admin access required' }, { status: 403 });
+    if (!user.isAdmin) {
+      throw new HttpError(403, 'Admin access required');
     }
 
     const appUrl = Deno.env.get('APP_URL') || 'https://homexrei.base44.com';
@@ -150,11 +149,13 @@ Deno.serve(async (req) => {
     });
 
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Automation failed';
+    const status = error instanceof HttpError ? error.status : 500;
     console.error('Automation error:', error);
     return Response.json({
       success: false,
-      error: error.message,
-      logs: [`Error: ${error.message}`]
-    }, { status: 500 });
+      error: message,
+      logs: [`Error: ${message}`]
+    }, { status });
   }
 });

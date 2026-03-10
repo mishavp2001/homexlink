@@ -207,34 +207,6 @@ export default function Insights() {
     mutationFn: ({ id, views }) => base44.entities.Insight.update(id, { views: views + 1 })
   });
 
-  const generateVideoMutation = useMutation({
-    mutationFn: async (insight) => {
-      const videoResponse = await base44.functions.invoke('generateInsightVideo', {
-        insightId: insight.id
-      });
-
-      if (!videoResponse.data?.success) {
-        throw new Error(videoResponse.data?.error || 'Failed to generate video');
-      }
-
-      return videoResponse.data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries(['insights']);
-      // Refresh user data to update credits
-      setUser(prev => ({ ...prev, credits: data.creditsRemaining }));
-      setViewingInsight(prev => prev ? { 
-        ...prev, 
-        video_url: data.videoUrl,
-        video_generated_date: new Date().toISOString()
-      } : null);
-      alert(`Video generated successfully! ${data.creditsRemaining} credits remaining.`);
-    },
-    onError: (error) => {
-      alert(`Failed to generate video: ${error.message}`);
-    }
-  });
-
   const handlePhotoUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
@@ -264,7 +236,7 @@ export default function Insights() {
     e.preventDefault();
     if (!user) {
       alert('Please sign in to share insights');
-      base44.auth.redirectToLogin(window.location.origin + createPageUrl('Insights'));
+      base44.auth.redirectToAppLogin(window.location.origin + createPageUrl('Insights'));
       return;
     }
 
@@ -288,16 +260,6 @@ export default function Insights() {
   const handleView = (insight) => {
     setViewingInsight(insight);
     viewInsightMutation.mutate({ id: insight.id, views: insight.views });
-  };
-
-  const handleGenerateVideo = async (insight) => {
-    // Check if user has enough credits
-    if (!user || user.credits < 1) {
-      setShowBuyCredits(true);
-      return;
-    }
-    
-    generateVideoMutation.mutate(insight);
   };
 
   // Helper function to calculate distance between two points (Haversine formula)
@@ -370,7 +332,6 @@ export default function Insights() {
   );
 
   const userCredits = user?.credits || 0;
-  const hasEnoughCredits = userCredits >= 1;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 pb-20" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
@@ -665,60 +626,7 @@ export default function Insights() {
                     </div>
                     <VideoPlayer videoUrl={viewingInsight.video_url} />
                   </div>
-                ) : viewingInsight.photo_urls?.length > 0 && user && user.email === viewingInsight.created_by && (
-                  <div className="mb-6">
-                    <Card className="p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-200">
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
-                            <Video className="w-5 h-5 text-white" />
-                          </div>
-                          <div>
-                            <h4 className="font-semibold text-gray-900">Generate Marketing Video</h4>
-                            <p className="text-xs text-gray-600">
-                              {hasEnoughCredits ? 
-                                'Create an AI-powered video (1 credit)' : 
-                                'Insufficient credits - buy more to generate video'}
-                            </p>
-                          </div>
-                        </div>
-                        {hasEnoughCredits ? (
-                          <Button
-                            onClick={() => handleGenerateVideo(viewingInsight)}
-                            disabled={generateVideoMutation.isPending}
-                            className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                          >
-                            {generateVideoMutation.isPending ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                                Generating...
-                              </>
-                            ) : (
-                              <>
-                                <Video className="w-4 h-4 mr-2" />
-                                Generate Video
-                              </>
-                            )}
-                          </Button>
-                        ) : (
-                          <Button
-                            onClick={() => setShowBuyCredits(true)}
-                            className="bg-[#d4af37] hover:bg-[#c49d2a] whitespace-nowrap"
-                          >
-                            <DollarSign className="w-4 h-4 mr-2" />
-                            Buy Credits
-                          </Button>
-                        )}
-                      </div>
-                      {user && (
-                        <div className="mt-3 pt-3 border-t border-purple-200 text-sm text-gray-600 flex items-center gap-2">
-                          <CreditCard className="w-4 h-4 text-[#d4af37]" />
-                          Your balance: <strong>{userCredits} credit{userCredits !== 1 ? 's' : ''}</strong>
-                        </div>
-                      )}
-                    </Card>
-                  </div>
-                )}
+                ) : null}
 
                 {viewingInsight.photo_urls?.length > 0 && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

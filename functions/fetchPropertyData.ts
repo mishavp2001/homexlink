@@ -1,14 +1,9 @@
 /// <reference lib="deno.ns" />
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { requireAmplifyUser, toErrorResponse } from './_amplifyAuth.ts';
 
 Deno.serve(async (req) => {
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-
-    if (!user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    await requireAmplifyUser(req);
 
     const { address } = await req.json();
 
@@ -75,9 +70,6 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Error fetching property data:', error);
-    return Response.json({ 
-      error: 'Internal server error', 
-      details: error.message 
-    }, { status: 500 });
+    return toErrorResponse(error, 'Failed to fetch property data');
   }
 });

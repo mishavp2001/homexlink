@@ -278,14 +278,6 @@ export default function Deals() {
       try {
         const offer = await base44.entities.Offer.create(offerData);
         
-        const pdfResponse = await base44.functions.invoke('generateOfferPDF', {
-          offerId: offer.id
-        });
-        
-        if (!pdfResponse.data.success) {
-          throw new Error('Failed to generate PDF');
-        }
-        
         const emailSubject = `New Purchase Offer - ${selectedDeal.location}`;
         const emailBody = `You have received a new purchase offer for your property!
 
@@ -300,8 +292,6 @@ OFFER DETAILS:
 - Earnest Money: $${offerData.earnest_money_deposit.toLocaleString()}
 - Proposed Closing: ${format(new Date(offerData.closing_date), 'MMMM d, yyyy')}
 - Offer Expires: ${format(new Date(offerData.expiration_date), 'MMMM d, yyyy')}
-
-📄 View formal offer document: ${pdfResponse.data.pdfUrl}
 
 Review and respond to this offer in your dashboard:
 ${window.location.origin}/dashboard`;
@@ -349,7 +339,7 @@ ${window.location.origin}/dashboard`;
   const handleSubmit = (data) => {
     if (!user) {
       alert('Please sign in to post a deal');
-      base44.auth.redirectToLogin(window.location.href);
+      base44.auth.redirectToAppLogin(window.location.href);
       return;
     }
 
@@ -377,7 +367,7 @@ ${window.location.origin}/dashboard`;
 
     if (!user) {
       alert('Please sign in to book this service');
-      base44.auth.redirectToLogin(window.location.href);
+      base44.auth.redirectToAppLogin(window.location.href);
       return;
     }
 

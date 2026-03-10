@@ -157,7 +157,7 @@ export default function Dashboard() {
       } catch (error) {
         console.error('Not authenticated', error);
         const dashboardUrl = window.location.origin + createPageUrl('Dashboard');
-        base44.auth.redirectToLogin(dashboardUrl);
+        base44.auth.redirectToAppLogin(dashboardUrl);
       }
       setLoadingAuth(false);
     };
@@ -1571,31 +1571,23 @@ Format as structured JSON.`;
                                 <p className="text-xs font-semibold text-blue-800 mb-2">QR Code for Redemption:</p>
                                 <img src={booking.qr_code_url} alt="QR Code" className="w-32 h-32 mx-auto mb-2" />
                                 {!booking.redeemed ? (
-                                  <Button
-                                    size="sm"
-                                    className="w-full bg-green-600 hover:bg-green-700"
-                                    onClick={async () => {
-                                      const confirmRedeem = confirm('Mark this deal as redeemed?');
-                                      if (!confirmRedeem) return;
-                                      
-                                      try {
-                                        const response = await base44.functions.invoke('verifyRedeemQR', {
-                                          qrData: booking.qr_code_data,
-                                          action: 'redeem'
-                                        });
-                                        
-                                        if (response.data.success) {
-                                          alert('Deal redeemed successfully!');
-                                          queryClient.invalidateQueries(['receivedBookings']);
-                                        }
-                                      } catch (error) {
-                                        alert(error.response?.data?.error || 'Failed to redeem');
-                                      }
-                                    }}
-                                  >
-                                    <CheckCircle2 className="w-4 h-4 mr-2" />
-                                    Verify & Redeem
-                                  </Button>
+                                  <div className="space-y-2">
+                                    <p className="text-xs text-blue-800 text-center">
+                                      In-app redemption is temporarily unavailable during the platform migration.
+                                    </p>
+                                    <Button
+                                      asChild
+                                      size="sm"
+                                      variant="outline"
+                                      className="w-full border-blue-300 text-blue-800 hover:bg-blue-100"
+                                    >
+                                      <a
+                                        href={`mailto:support@homexrei.com?subject=${encodeURIComponent(`Redemption request for booking ${booking.id}`)}&body=${encodeURIComponent(`Please mark this booking as redeemed.\n\nBooking ID: ${booking.id}\nProperty: ${booking.property_address}\nOwner: ${user?.email || ''}\nRenter: ${booking.renter_email || ''}`)}`}
+                                      >
+                                        Contact Support to Redeem
+                                      </a>
+                                    </Button>
+                                  </div>
                                 ) : (
                                   <p className="text-xs text-purple-800 text-center">
                                     ✓ Redeemed on {format(new Date(booking.redeemed_date), 'MMM d, h:mm a')}

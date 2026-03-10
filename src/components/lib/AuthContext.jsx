@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { getOAuthRedirectUri } from '@/components/lib/platform-utils';
+import { buildLoginUrl } from '@/lib/login-route';
 import { restorePostLoginRedirect } from '@/utils/mobileAuth';
 
 const AuthContext = createContext(null);
@@ -61,18 +61,17 @@ export const AuthProvider = ({ children }) => {
     
     if (shouldRedirect) {
       // Use the SDK's logout method which handles token cleanup and redirect
-      // Get the appropriate redirect URI based on platform
-      const redirectUri = getOAuthRedirectUri(window.location.href);
-      base44.auth.logout(redirectUri);
+      base44.auth.logout(window.location.href);
     } else {
       // Just remove the token without redirect
       base44.auth.logout();
     }
   };
 
-  const navigateToLogin = async () => {
-    const redirectUri = getOAuthRedirectUri(window.location.href);
-    return base44.auth.redirectToLogin(redirectUri);
+  const navigateToLogin = (nextUrl = null) => {
+    const targetUrl = nextUrl || window.location.href;
+    window.location.assign(buildLoginUrl(targetUrl));
+    return Promise.resolve();
   };
 
   return (

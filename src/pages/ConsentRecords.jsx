@@ -106,7 +106,7 @@ export default function ConsentRecords() {
           <Shield className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
           <p className="text-gray-600 mb-6">Please sign in to view consent records</p>
-          <Button onClick={() => base44.auth.redirectToLogin()}>
+          <Button onClick={() => base44.auth.redirectToAppLogin()}>
             Sign In
           </Button>
         </div>

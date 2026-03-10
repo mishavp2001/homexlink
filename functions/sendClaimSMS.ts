@@ -1,5 +1,5 @@
 /// <reference lib="deno.ns" />
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { HttpError, requireAmplifyUser, toErrorResponse } from './_amplifyAuth.ts';
 
 const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
 const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
@@ -7,11 +7,10 @@ const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER');
 
 Deno.serve(async (req) => {
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    const user = await requireAmplifyUser(req);
 
-    if (user?.role !== 'admin') {
-      return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+    if (!user.isAdmin) {
+      throw new HttpError(403, 'Forbidden: Admin access required');
     }
 
     const { phoneNumber, businessName, claimUrl } = await req.json();
@@ -45,6 +44,6 @@ Deno.serve(async (req) => {
 
     return Response.json({ success: true, messageSid: result.sid });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return toErrorResponse(error, 'Failed to send claim SMS');
   }
 });

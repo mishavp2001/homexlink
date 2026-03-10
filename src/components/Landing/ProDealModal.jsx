@@ -42,7 +42,7 @@ export default function ProDealModal({ onClose }) {
     if (!profileData.business_name || !profileData.email) { alert('Please fill in all required fields'); return; }
     setCreating(true);
     await base44.entities.PendingUser.create({ email: profileData.email, full_name: profileData.business_name, phone: profileData.phone, user_type: 'service_provider', deal_data: dealData, status: 'pending' });
-    base44.auth.redirectToLogin(window.location.origin + createPageUrl('Dashboard') + '?signup=true&name=' + encodeURIComponent(profileData.business_name) + '&email=' + encodeURIComponent(profileData.email));
+    base44.auth.redirectToAppLogin(window.location.origin + createPageUrl('Dashboard') + '?signup=true&name=' + encodeURIComponent(profileData.business_name) + '&email=' + encodeURIComponent(profileData.email));
   };
 
   const steps = [{ number: 1, title: 'Deal Info' }, { number: 2, title: 'Create Account' }];

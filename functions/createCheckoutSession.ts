@@ -1,16 +1,28 @@
 /// <reference lib="deno.ns" />
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
+import { requireAmplifyUser, toErrorResponse } from './_amplifyAuth.ts';
 import Stripe from 'npm:stripe@14.11.0';
+
+const FALLBACK_APP_URL = 'https://homexrei.com';
+
+const resolveAppUrl = (req: Request) => {
+  for (const candidate of [req.headers.get('x-origin-url'), req.headers.get('origin'), req.headers.get('referer')]) {
+    if (!candidate) {
+      continue;
+    }
+
+    try {
+      return new URL(candidate).origin;
+    } catch (error) {
+      console.error('Failed to parse app URL from request header:', candidate, error);
+    }
+  }
+
+  return FALLBACK_APP_URL;
+};
 
 Deno.serve(async (req) => {
   try {
-    const base44 = createClientFromRequest(req);
-    
-    // Verify user is authenticated
-    const user = await base44.auth.me();
-    if (!user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const user = await requireAmplifyUser(req);
 
     const { amount, invoiceIds } = await req.json();
     
@@ -27,23 +39,22 @@ Deno.serve(async (req) => {
       apiVersion: '2023-10-16',
     });
 
-    // Get the origin from request headers
-    const origin = req.headers.get('origin') || 'https://your-app.base44.com';
+    const appUrl = resolveAppUrl(req);
+    const userIdentifier = user.sub || user.username || user.email || 'unknown';
 
     console.log('Creating checkout session for user:', user.email);
     console.log('Amount:', amount, 'Invoice IDs:', invoiceIds);
-    console.log('Origin:', origin);
+    console.log('App URL:', appUrl);
 
     let lineItems;
     let metadata = {
-      user_id: user.id,
-      user_email: user.email,
+      user_id: userIdentifier,
+      user_email: user.email || '',
     };
 
     // Check if this is for invoices or credits
     if (invoiceIds && invoiceIds.length > 0) {
       // Invoice payment
-      const totalDollars = amount / 100;
       lineItems = [
         {
           price_data: {
@@ -84,10 +95,10 @@ Deno.serve(async (req) => {
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
-      success_url: `${origin}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: invoiceIds ? `${origin}/ProviderBilling` : `${origin}/Insights`,
+      success_url: `${appUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: invoiceIds ? `${appUrl}/ProviderBilling` : `${appUrl}/Insights`,
       metadata: metadata,
-      customer_email: user.email,
+      customer_email: user.email || undefined,
     });
 
     console.log('Checkout session created:', session.id);
@@ -99,8 +110,6 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Checkout session error:', error);
-    return Response.json({ 
-      error: error.message || 'Failed to create checkout session' 
-    }, { status: 500 });
+    return toErrorResponse(error, 'Failed to create checkout session');
   }
 });

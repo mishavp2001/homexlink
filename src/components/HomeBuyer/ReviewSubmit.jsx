@@ -61,7 +61,7 @@ export default function ReviewSubmit({ criteria, selectedHome, desiredChanges, o
           '&phone=' + encodeURIComponent(userData.phone || '') +
           '&type=first_time_buyer';
         
-        base44.auth.redirectToLogin(signupUrl);
+        base44.auth.redirectToAppLogin(signupUrl);
       }, 2000);
       
     } catch (error) {

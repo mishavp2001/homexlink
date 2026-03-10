@@ -36,7 +36,7 @@ export default function Messages() {
         setUser(currentUser);
       } catch (error) {
         console.error('Not authenticated', error);
-        base44.auth.redirectToLogin(window.location.origin + createPageUrl('Messages'));
+        base44.auth.redirectToAppLogin(window.location.origin + createPageUrl('Messages'));
       }
       setLoadingAuth(false);
     };

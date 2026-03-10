@@ -1,49 +1,45 @@
-/// <reference lib="deno.ns" />
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import {
+  mapServiceListingToPublicProvider,
+  queryAmplifyPublicData,
+  SERVICE_LISTING_PUBLIC_FIELDS,
+} from './_amplifyPublicData.ts';
+
+declare const Deno: {
+  serve(handler: (req: Request) => Response | Promise<Response>): void;
+};
+
+const GET_SERVICE_PROVIDER_BY_EMAIL = `
+  query GetServiceProviderByEmail($email: String!) {
+    listServiceListings(filter: { expert_email: { eq: $email } }, limit: 1) {
+      items {
+        ${SERVICE_LISTING_PUBLIC_FIELDS}
+      }
+    }
+  }
+`;
 
 Deno.serve(async (req) => {
   try {
-    // Initialize with service role for public profile viewing
-    const base44 = createClientFromRequest(req);
-    
     const { email } = await req.json();
     
     if (!email) {
       return Response.json({ error: 'Email is required' }, { status: 400 });
     }
 
-    // Fetch only from ServiceListing - no Users table access
-    const listings = await base44.asServiceRole.entities.ServiceListing.filter({ expert_email: email });
+    const data = await queryAmplifyPublicData(GET_SERVICE_PROVIDER_BY_EMAIL, { email });
+    const listings = Array.isArray(data?.listServiceListings?.items)
+      ? data.listServiceListings.items.filter(Boolean)
+      : [];
     
     if (listings.length === 0) {
       return Response.json({ error: 'Profile not found' }, { status: 404 });
     }
 
-    const serviceListing = listings[0];
-    
-    // Return service listing data
-    return Response.json({ 
-      email: serviceListing.expert_email,
-      user_type: 'service_provider',
-      profile_type: 'business',
-      bio: serviceListing.bio,
-      business_name: serviceListing.business_name,
-      business_photo_url: serviceListing.business_photo_url,
-      business_phone: serviceListing.business_phone,
-      business_address: serviceListing.business_address,
-      service_types: serviceListing.service_types,
-      service_areas: serviceListing.service_areas,
-      certifications: serviceListing.certifications,
-      years_in_business: serviceListing.years_in_business,
-      website_url: serviceListing.website_url,
-      social_links: serviceListing.social_links,
-      work_photos: serviceListing.work_photos,
-      price_list: serviceListing.price_list,
-      quote_assistant_instructions: serviceListing.quote_assistant_instructions
-    });
+    return Response.json(mapServiceListingToPublicProvider(listings[0]));
     
   } catch (error) {
     console.error('Error:', error);
-    return Response.json({ error: error.message }, { status: 500 });
+    const message = error instanceof Error ? error.message : String(error);
+    return Response.json({ error: message }, { status: 500 });
   }
 });

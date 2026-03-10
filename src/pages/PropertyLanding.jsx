@@ -294,18 +294,7 @@ export default function PropertyLanding() {
         const offer = await base44.entities.Offer.create(offerData);
         console.log('✅ Offer created:', offer.id);
 
-        // 2. Generate PDF
-        console.log('Generating offer PDF...');
-        const pdfResponse = await base44.functions.invoke('generateOfferPDF', {
-          offerId: offer.id
-        });
-
-        if (!pdfResponse.data.success) {
-          throw new Error('Failed to generate PDF');
-        }
-        console.log('✅ PDF generated:', pdfResponse.data.pdfUrl);
-
-        // 3. Send email to property owner with PDF
+        // 2. Send email to property owner
         const emailSubject = `New Purchase Offer - ${deal.location}`;
         const emailBody = `You have received a new purchase offer for your property!
 
@@ -326,8 +315,6 @@ ${offerData.inspection_contingency ? `✓ Inspection (${offerData.inspection_per
 ${offerData.appraisal_contingency ? '✓ Appraisal' : ''}
 ${offerData.financing_contingency ? '✓ Financing' : ''}
 
-📄 View formal offer document: ${pdfResponse.data.pdfUrl}
-
 Review and respond to this offer in your dashboard:
 ${window.location.origin}/dashboard
 
@@ -343,7 +330,7 @@ This is an automated message from HomeXREI.
         });
         console.log('✅ Email sent to owner');
 
-        // 4. Send in-app message
+        // 3. Send in-app message
         console.log('Creating in-app message...');
         await base44.entities.Message.create({
           sender_email: currentUser.email,
@@ -446,7 +433,7 @@ This is an automated message from HomeXREI.
 
     if (!currentUser) {
       alert('Please sign in to make a booking');
-      base44.auth.redirectToLogin(window.location.href);
+      base44.auth.redirectToAppLogin(window.location.href);
       return;
     }
 
@@ -620,7 +607,7 @@ This is an automated message from HomeXREI.
   const handleServiceDealBooking = async (service) => {
     if (!currentUser) {
       alert('Please sign in to book this service');
-      base44.auth.redirectToLogin(window.location.href);
+      base44.auth.redirectToAppLogin(window.location.href);
       return;
     }
 
@@ -929,7 +916,7 @@ Format the output as HTML paragraphs (e.g., <p>...</p><p>...</p>) to ensure prop
   const handleOfferSubmit = (offerData) => {
     if (!currentUser) {
       alert('Please sign in to make an offer');
-      base44.auth.redirectToLogin(window.location.href);
+      base44.auth.redirectToAppLogin(window.location.href);
       return;
     }
 
@@ -1005,7 +992,7 @@ Format the output as HTML paragraphs (e.g., <p>...</p><p>...</p>) to ensure prop
   const handleSave = async () => {
     if (!currentUser) {
       alert('Please sign in to save deals');
-      base44.auth.redirectToLogin(window.location.href);
+      base44.auth.redirectToAppLogin(window.location.href);
       return;
     }
 
@@ -1836,7 +1823,7 @@ Format the output as HTML paragraphs (e.g., <p>...</p><p>...</p>) to ensure prop
                       onClick={() => {
                         if (!currentUser) {
                           alert('Please sign in to make an offer');
-                          base44.auth.redirectToLogin(window.location.href);
+                          base44.auth.redirectToAppLogin(window.location.href);
                           return;
                         }
                         setShowOfferForm(true);

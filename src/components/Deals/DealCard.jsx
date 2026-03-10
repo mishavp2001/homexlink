@@ -107,7 +107,7 @@ export default function DealCard({ deal, onViewDetails, onMakeOffer, isOwner }) 
     
     if (!currentUser) {
       alert('Please sign in to save deals');
-      base44.auth.redirectToLogin(window.location.href);
+      base44.auth.redirectToAppLogin(window.location.href);
       return;
     }
 
@@ -132,7 +132,7 @@ export default function DealCard({ deal, onViewDetails, onMakeOffer, isOwner }) 
     
     if (!currentUser) {
       alert('Please sign in to contact seller');
-      base44.auth.redirectToLogin(window.location.href);
+      base44.auth.redirectToAppLogin(window.location.href);
       return;
     }
 
@@ -147,7 +147,7 @@ export default function DealCard({ deal, onViewDetails, onMakeOffer, isOwner }) 
     
     if (!currentUser) {
       alert('Please sign in to make an offer');
-      base44.auth.redirectToLogin(window.location.href);
+      base44.auth.redirectToAppLogin(window.location.href);
       return;
     }
     

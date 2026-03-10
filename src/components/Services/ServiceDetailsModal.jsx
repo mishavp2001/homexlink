@@ -83,7 +83,7 @@ export default function ServiceDetailsModal({ service, isOpen, onClose, currentU
   const handleSubmitReview = (reviewData) => {
     if (!currentUser) {
       alert('Please sign in to leave a review');
-      base44.auth.redirectToLogin(window.location.href);
+      base44.auth.redirectToAppLogin(window.location.href);
       return;
     }
 

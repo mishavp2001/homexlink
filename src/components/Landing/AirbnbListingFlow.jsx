@@ -103,7 +103,7 @@ export default function AirbnbListingFlow() {
         <h3 className="text-white text-xl font-bold">Listing Ready!</h3>
         <p className="text-white/80 text-sm">Create your free account to publish and manage your short-term rental.</p>
         <Button
-          onClick={() => base44.auth.redirectToLogin(window.location.origin + createPageUrl('Dashboard') + '?signup=true')}
+          onClick={() => base44.auth.redirectToAppLogin(window.location.origin + createPageUrl('Dashboard') + '?signup=true')}
           className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 h-11"
         >
           Create Free Account

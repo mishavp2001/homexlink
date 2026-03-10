@@ -1,17 +1,7 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
+/// <reference lib="deno.ns" />
 
 Deno.serve(async (req) => {
   try {
-    const base44 = createClientFromRequest(req);
-    
-    // Check if user is authenticated, but don't require it
-    let user = null;
-    try {
-      user = await base44.auth.me();
-    } catch (e) {
-      // User not authenticated - that's okay for claiming
-    }
-
     const { phoneNumber } = await req.json();
     
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
@@ -47,6 +37,7 @@ Deno.serve(async (req) => {
     return Response.json({ success: true, status: result.status });
   } catch (error) {
     console.error('Error sending verification:', error);
-    return Response.json({ error: error.message }, { status: 500 });
+    const message = error instanceof Error ? error.message : String(error);
+    return Response.json({ error: message }, { status: 500 });
   }
 });

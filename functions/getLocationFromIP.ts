@@ -1,10 +1,7 @@
 /// <reference lib="deno.ns" />
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 Deno.serve(async (req) => {
   try {
-    const base44 = createClientFromRequest(req);
-
     // Get user's IP address from request headers
     const forwardedFor = req.headers.get('x-forwarded-for');
     const realIP = req.headers.get('x-real-ip');

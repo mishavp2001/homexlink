@@ -1,18 +1,32 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
+import {
+  listAmplifyPublicItems,
+  mapServiceListingToPublicProvider,
+  SERVICE_LISTING_PUBLIC_FIELDS,
+} from './_amplifyPublicData.ts';
+
+const LIST_SERVICE_PROVIDERS = `
+  query ListServiceProviders($filter: ModelServiceListingFilterInput, $limit: Int, $nextToken: String) {
+    listServiceListings(filter: $filter, limit: $limit, nextToken: $nextToken) {
+      items {
+        ${SERVICE_LISTING_PUBLIC_FIELDS}
+      }
+      nextToken
+    }
+  }
+`;
 
 Deno.serve(async (req) => {
   try {
-    const base44 = createClientFromRequest(req);
-    
-    // Use service role to bypass RLS and fetch all users
-    const users = await base44.asServiceRole.entities.User.list();
-    
-    // Filter for service providers with business profiles
-    const serviceProviders = users.filter(u => 
-      u.user_type === 'service_provider' && 
-      u.profile_type === 'business' && 
-      u.service_types?.length > 0
-    );
+    req;
+
+    const listings = await listAmplifyPublicItems({
+      query: LIST_SERVICE_PROVIDERS,
+      rootField: 'listServiceListings',
+    });
+
+    const serviceProviders = listings
+      .map(mapServiceListingToPublicProvider)
+      .filter(provider => provider.business_name && provider.service_types?.length > 0);
     
     return Response.json(serviceProviders);
   } catch (error) {

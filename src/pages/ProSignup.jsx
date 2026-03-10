@@ -1,14 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Card } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import { CheckCircle2, ArrowRight, ArrowLeft, Loader2, Wrench } from 'lucide-react';
+import { useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
+import { buildLoginUrl } from '@/lib/login-route';
 import { createPageUrl } from '@/utils';
-import { useNavigate } from 'react-router-dom';
 
 export default function ProSignup() {
   useEffect(() => {
@@ -17,7 +10,7 @@ export default function ProSignup() {
     
     // Redirect to signup/login immediately
     const dashboardUrl = window.location.origin + createPageUrl('Dashboard') + '?setup=business';
-    base44.auth.redirectToLogin(dashboardUrl);
+    window.location.assign(buildLoginUrl(dashboardUrl, { mode: 'signUp' }));
   }, []);
 
   return (

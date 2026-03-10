@@ -31,9 +31,9 @@ export default function EditProperty() {
       try {
         const currentUser = await base44.auth.me();
         setUser(currentUser);
-        if (!currentUser) base44.auth.redirectToLogin(window.location.href);
+        if (!currentUser) base44.auth.redirectToAppLogin(window.location.href);
       } catch (error) {
-        base44.auth.redirectToLogin(window.location.href);
+        base44.auth.redirectToAppLogin(window.location.href);
       }
     };
     loadUser();

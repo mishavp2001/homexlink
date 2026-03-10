@@ -1,33 +1,45 @@
 /// <reference lib="deno.ns" />
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
+import {
+  listAmplifyPublicItems,
+  mapServiceListingToPublicProvider,
+  SERVICE_LISTING_PUBLIC_FIELDS,
+} from './_amplifyPublicData.ts';
+
+const LIST_SERVICE_PROVIDERS = `
+  query ListServiceProvidersForBusinessLookup($filter: ModelServiceListingFilterInput, $limit: Int, $nextToken: String) {
+    listServiceListings(filter: $filter, limit: $limit, nextToken: $nextToken) {
+      items {
+        ${SERVICE_LISTING_PUBLIC_FIELDS}
+      }
+      nextToken
+    }
+  }
+`;
 
 Deno.serve(async (req) => {
   try {
-    const base44 = createClientFromRequest(req);
     const { businessName } = await req.json();
 
     if (!businessName) {
       return Response.json({ error: 'Business name is required' }, { status: 400 });
     }
 
-    // Fetch all users (service role needed to access user data)
-    const users = await base44.asServiceRole.entities.User.list();
-    
-    // Find user by business name (case-insensitive match)
-    const user = users.find(u => 
-      u.business_name && 
-      u.business_name.toLowerCase() === businessName.toLowerCase()
+    const listings = await listAmplifyPublicItems({
+      query: LIST_SERVICE_PROVIDERS,
+      rootField: 'listServiceListings',
+    });
+
+    const listing = listings.find(item =>
+      item.business_name && item.business_name.toLowerCase() === businessName.toLowerCase()
     );
 
-    if (!user) {
+    if (!listing) {
       return Response.json({ error: 'Business not found' }, { status: 404 });
     }
 
-    // Return only public info
     return Response.json({
       success: true,
-      email: user.email,
-      business_name: user.business_name
+      ...mapServiceListingToPublicProvider(listing),
     });
 
   } catch (error) {

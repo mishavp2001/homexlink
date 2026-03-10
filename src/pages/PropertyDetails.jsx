@@ -112,7 +112,7 @@ export default function PropertyDetails() {
     if (!user) {
       alert('Please log in to request a service quote.');
       const propertyDetailsUrl = window.location.origin + window.location.pathname + window.location.search;
-      base44.auth.redirectToLogin(propertyDetailsUrl);
+      base44.auth.redirectToAppLogin(propertyDetailsUrl);
       return;
     }
 
@@ -144,7 +144,7 @@ export default function PropertyDetails() {
     if (!user) {
       alert('Please log in to request a service quote.');
       const propertyDetailsUrl = window.location.origin + window.location.pathname + window.location.search;
-      base44.auth.redirectToLogin(propertyDetailsUrl);
+      base44.auth.redirectToAppLogin(propertyDetailsUrl);
       return;
     }
 

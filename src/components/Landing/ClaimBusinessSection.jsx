@@ -153,7 +153,7 @@ export default function ClaimBusinessSection() {
         '&name=' + encodeURIComponent(selectedBusiness.name) +
         '&phone=' + encodeURIComponent(phoneNumber);
 
-      base44.auth.redirectToLogin(signupUrl);
+      base44.auth.redirectToAppLogin(signupUrl);
     } catch (error) {
       console.error('Error verifying:', error);
       alert('Verification failed. Please try again.');

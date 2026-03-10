@@ -40,7 +40,7 @@ export default function DealDetailsModal({ deal, isOpen, onClose, isOwner, onEdi
 
   const handleSendMessage = () => {
     if (!currentUser) {
-      base44.auth.redirectToLogin(window.location.href);
+      base44.auth.redirectToAppLogin(window.location.href);
       return;
     }
 
@@ -124,16 +124,6 @@ export default function DealDetailsModal({ deal, isOpen, onClose, isOwner, onEdi
         const offer = await base44.entities.Offer.create(offerData);
         console.log('✅ Offer created:', offer.id);
         
-        console.log('Generating offer PDF...');
-        const pdfResponse = await base44.functions.invoke('generateOfferPDF', {
-          offerId: offer.id
-        });
-        
-        if (!pdfResponse.data.success) {
-          throw new Error('Failed to generate PDF');
-        }
-        console.log('✅ PDF generated:', pdfResponse.data.pdfUrl);
-        
         const emailSubject = `New Purchase Offer - ${deal.location}`;
         const emailBody = `You have received a new purchase offer for your property!
 
@@ -153,8 +143,6 @@ CONTINGENCIES:
 ${offerData.inspection_contingency ? `✓ Inspection (${offerData.inspection_period_days} days)` : ''}
 ${offerData.appraisal_contingency ? '✓ Appraisal' : ''}
 ${offerData.financing_contingency ? '✓ Financing' : ''}
-
-📄 View formal offer document: ${pdfResponse.data.pdfUrl}
 
 Review and respond to this offer in your dashboard:
 ${window.location.origin}/dashboard
@@ -198,7 +186,7 @@ This is an automated message from HomeXREI.
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['offers']);
-      alert('✅ Offer submitted successfully!\n\nYour formal offer has been sent to the property owner. They will review and respond within the expiration period. You can track the status in your dashboard.');
+      alert('✅ Offer submitted successfully!\n\nYour offer has been sent to the property owner. They will review and respond within the expiration period. You can track the status in your dashboard.');
       setShowOfferForm(false);
     },
     onError: (error) => {
@@ -210,7 +198,7 @@ This is an automated message from HomeXREI.
   const handleOfferSubmit = (offerData) => {
     if (!currentUser) {
       alert('Please sign in to make an offer');
-      base44.auth.redirectToLogin(window.location.href);
+      base44.auth.redirectToAppLogin(window.location.href);
       return;
     }
     
@@ -480,7 +468,7 @@ This is an automated message from HomeXREI.
               onClick={async () => {
                 if (!currentUser) {
                   alert('Please sign in to purchase this deal');
-                  base44.auth.redirectToLogin(window.location.href);
+                  base44.auth.redirectToAppLogin(window.location.href);
                   return;
                 }
                 
@@ -511,7 +499,7 @@ This is an automated message from HomeXREI.
               onClick={() => {
                 if (!currentUser) {
                   alert('Please sign in to make an offer');
-                  base44.auth.redirectToLogin(window.location.href);
+                  base44.auth.redirectToAppLogin(window.location.href);
                   return;
                 }
                 setShowOfferForm(true);
@@ -769,7 +757,7 @@ This is an automated message from HomeXREI.
               <div className="py-12 text-center">
                 <Loader2 className="w-12 h-12 animate-spin text-[#1e3a5f] mx-auto mb-4" />
                 <p className="text-gray-600">
-                  Processing your offer and generating documents...
+                  Processing your offer...
                 </p>
               </div>
             ) : (

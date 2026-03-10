@@ -369,7 +369,7 @@ Be thorough and professional.`,
         } else {
           // Not logged in, redirect to login/signup
           const dashboardUrl = window.location.origin + createPageUrl('Dashboard');
-          base44.auth.redirectToLogin(dashboardUrl);
+          base44.auth.redirectToAppLogin(dashboardUrl);
         }
       }, 2000);
 

@@ -66,7 +66,7 @@ export default function PropertyCapture() {
 
   const handleLogin = () => {
     const dashboardUrl = window.location.origin + createPageUrl('Dashboard');
-    base44.auth.redirectToLogin(dashboardUrl);
+    base44.auth.redirectToAppLogin(dashboardUrl);
   };
 
   if (checking) {

@@ -1,16 +1,10 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
+declare const Deno: {
+  env: { get(name: string): string | undefined };
+  serve(handler: (req: Request) => Response | Promise<Response>): void;
+};
 
 Deno.serve(async (req) => {
   try {
-    const base44 = createClientFromRequest(req);
-    
-    // Optional auth check - allow public access
-    try {
-      await base44.auth.me();
-    } catch (error) {
-      // Public access allowed
-    }
-
     const { query, maxResults = 10 } = await req.json();
     
     if (!query) {
@@ -34,7 +28,7 @@ Deno.serve(async (req) => {
     }
 
     // Format videos
-    const videos = data.items?.map(item => ({
+    const videos = data.items?.map((item: any) => ({
       id: item.id.videoId,
       title: item.snippet.title,
       description: item.snippet.description,
@@ -47,6 +41,7 @@ Deno.serve(async (req) => {
     return Response.json({ videos });
   } catch (error) {
     console.error('Error searching YouTube:', error);
-    return Response.json({ error: error.message }, { status: 500 });
+    const message = error instanceof Error ? error.message : String(error);
+    return Response.json({ error: message }, { status: 500 });
   }
 });

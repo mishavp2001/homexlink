@@ -1,8 +1,9 @@
 import { createClient } from '@base44/sdk';
 import { generateClient } from 'aws-amplify/api';
-import { fetchAuthSession, fetchUserAttributes, getCurrentUser, signInWithRedirect, signOut } from 'aws-amplify/auth';
+import { fetchAuthSession, fetchUserAttributes, getCurrentUser, signOut } from 'aws-amplify/auth';
 import { appParams } from '@/lib/app-params';
-import { amplifyRuntimeConfig, canUseManagedAmplifyLogin, isAmplifyRuntimeEnabled } from '@/lib/amplify-config';
+import { amplifyRuntimeConfig, isAmplifyRuntimeEnabled } from '@/lib/amplify-config';
+import { buildLoginUrl } from '@/lib/login-route';
 
 const { appId, serverUrl, token, functionsVersion } = appParams;
 
@@ -70,6 +71,18 @@ const MODEL_DEFINITIONS = {
       'total_leads_received', 'billing_profile', 'createdAt', 'updatedAt'
     ].join(' '),
   },
+  LeadCharge: {
+    aliases: ['LeadCharge'],
+    listOperation: 'listLeadCharges',
+    createOperation: 'createLeadCharge',
+    updateOperation: 'updateLeadCharge',
+    deleteOperation: 'deleteLeadCharge',
+    readAccess: 'private',
+    selectionSet: [
+      'id', 'provider_email', 'provider_name', 'maintenance_task_id', 'property_address', 'project_title',
+      'lead_amount', 'lead_quality', 'status', 'stripe_invoice_id', 'paid_at', 'createdAt', 'updatedAt'
+    ].join(' '),
+  },
   Setting: {
     aliases: ['Setting', 'Settings'],
     listOperation: 'listSettings',
@@ -87,8 +100,8 @@ const MODEL_DEFINITIONS = {
     deleteOperation: 'deletePageMetadata',
     readAccess: 'public',
     selectionSet: [
-      'id', 'page_name', 'meta_title', 'meta_description', 'meta_keywords', 'is_auto_generated',
-      'last_generated_date', 'createdAt', 'updatedAt'
+      'id', 'page_name', 'meta_title', 'meta_description', 'meta_keywords', 'og_title', 'og_description',
+      'twitter_title', 'twitter_description', 'is_auto_generated', 'last_generated_date', 'createdAt', 'updatedAt'
     ].join(' '),
   },
   PropertyComponent: {
@@ -123,6 +136,19 @@ const MODEL_DEFINITIONS = {
     deleteOperation: 'deleteReport',
     readAccess: 'private',
     selectionSet: 'id property_id user_email report_type report_data status createdAt updatedAt',
+  },
+  Review: {
+    aliases: ['Review'],
+    listOperation: 'listReviews',
+    createOperation: 'createReview',
+    updateOperation: 'updateReview',
+    deleteOperation: 'deleteReview',
+    readAccess: 'public',
+    legacyOperations: ['update'],
+    selectionSet: [
+      'id', 'service_listing_id', 'reviewer_email', 'reviewer_name', 'rating', 'review_text',
+      'helpful_count', 'status', 'createdAt', 'updatedAt'
+    ].join(' '),
   },
   SavedDeal: {
     aliases: ['SavedDeal'],
@@ -282,6 +308,21 @@ const requestLegacyApi = async ({ path, data, kind, name, includeFunctionsVersio
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
+  const amplifySession = await getAmplifySession();
+  const amplifyIdToken = amplifySession?.tokens?.idToken?.toString?.();
+  const amplifyAccessToken = amplifySession?.tokens?.accessToken?.toString?.();
+  const amplifyAuthorizationToken = amplifyIdToken || amplifyAccessToken;
+
+  if (amplifyAuthorizationToken) {
+    headers['X-Amplify-Authorization'] = `Bearer ${amplifyAuthorizationToken}`;
+  }
+  if (amplifyIdToken) {
+    headers['X-Amplify-Id-Token'] = `Bearer ${amplifyIdToken}`;
+  }
+  if (amplifyAccessToken) {
+    headers['X-Amplify-Access-Token'] = `Bearer ${amplifyAccessToken}`;
+  }
+
   if (typeof window !== 'undefined') {
     headers['X-Origin-URL'] = window.location.href;
   }
@@ -339,6 +380,11 @@ const invokeLegacyIntegration = (packageName, endpointName, data) =>
     name: `${packageName}.${endpointName}`,
     unavailableMessage: `The integrations.${String(packageName)}.${String(endpointName)} operation is not available in Amplify mode without legacy Base44 runtime configuration.`,
   });
+
+const invokeIntegrationEndpoint = async (packageName, endpointName, data) => {
+  const response = await invokeLegacyIntegration(packageName, endpointName, data);
+  return response.data;
+};
 
 const ensureLegacyMethod = (group, method, entityName) => {
   const target = entityName ? legacyBase44?.[group]?.[entityName]?.[method] : legacyBase44?.[group]?.[method];
@@ -477,6 +523,9 @@ const normalizeRecord = (modelName, record) => {
   if (record.updatedAt && !normalized.updated_date) {
     normalized.updated_date = record.updatedAt;
   }
+  if (modelName === 'LeadCharge' && normalized.paid_at && !normalized.payment_date) {
+    normalized.payment_date = normalized.paid_at;
+  }
   if (modelName === 'ServiceListing') {
     if (normalized.years_experience == null && normalized.years_in_business != null) {
       normalized.years_experience = normalized.years_in_business;
@@ -538,7 +587,15 @@ const normalizeModelInput = (modelName, input, existingRecord = null) => {
   delete normalized.created_date;
   delete normalized.updated_date;
 
-  if (modelName === 'ServiceListing') {
+  if (modelName === 'LeadCharge') {
+    if (hasOwn(normalized, 'payment_date') && !hasOwn(normalized, 'paid_at')) {
+      normalized.paid_at = normalized.payment_date;
+    }
+    delete normalized.payment_date;
+    delete normalized.payment_method;
+  } else if (modelName === 'ProviderSettings') {
+    delete normalized.total_amount_billed;
+  } else if (modelName === 'ServiceListing') {
     if (normalized.years_experience != null && normalized.years_in_business == null) {
       normalized.years_in_business = normalized.years_experience;
     }
@@ -627,6 +684,10 @@ const normalizeModelInput = (modelName, input, existingRecord = null) => {
       normalized.report_data = reportData;
     }
     delete normalized.summary;
+  } else if (modelName === 'Review') {
+    if (normalized.status == null) {
+      normalized.status = 'published';
+    }
   }
 
   return normalized;
@@ -720,6 +781,14 @@ const canUseAmplifyEntity = async (definition, operation) => {
   }
 
   return hasAmplifySession();
+};
+
+const shouldUseAmplifyEntityOperation = async (definition, operation) => {
+  if (definition?.legacyOperations?.includes(operation)) {
+    return false;
+  }
+
+  return canUseAmplifyEntity(definition, operation);
 };
 
 const graphql = async ({ query, variables, authMode, operationName }) => {
@@ -882,19 +951,19 @@ const createEntityAdapter = entityName => {
 
   return {
     list: async (sortOrLimit, limitArg) => {
-      if (!(await canUseAmplifyEntity(definition, 'list'))) {
+      if (!(await shouldUseAmplifyEntityOperation(definition, 'list'))) {
         return callLegacyEntity(entityName, 'list', sortOrLimit, limitArg);
       }
       return listModelRecords(definition, parseListArgs(sortOrLimit, limitArg));
     },
     filter: async (criteria, sortOrLimit, limitArg) => {
-      if (!(await canUseAmplifyEntity(definition, 'filter'))) {
+      if (!(await shouldUseAmplifyEntityOperation(definition, 'filter'))) {
         return callLegacyEntity(entityName, 'filter', criteria, sortOrLimit, limitArg);
       }
       return listModelRecords(definition, parseFilterArgs(criteria, sortOrLimit, limitArg));
     },
     create: async input => {
-      if (!(await canUseAmplifyEntity(definition, 'create'))) {
+      if (!(await shouldUseAmplifyEntityOperation(definition, 'create'))) {
         return callLegacyEntity(entityName, 'create', input);
       }
       const createInput = normalizeModelInput(
@@ -910,7 +979,7 @@ const createEntityAdapter = entityName => {
       return normalizeRecord(definition.modelName, created);
     },
     update: async (id, input) => {
-      if (!(await canUseAmplifyEntity(definition, 'update'))) {
+      if (!(await shouldUseAmplifyEntityOperation(definition, 'update'))) {
         return callLegacyEntity(entityName, 'update', id, input);
       }
       const existingRecord = ['PropertyComponent', 'MaintenanceTask', 'Report'].includes(definition.modelName)
@@ -925,7 +994,7 @@ const createEntityAdapter = entityName => {
       return normalizeRecord(definition.modelName, updated);
     },
     delete: async id => {
-      if (!(await canUseAmplifyEntity(definition, 'delete'))) {
+      if (!(await shouldUseAmplifyEntityOperation(definition, 'delete'))) {
         return callLegacyEntity(entityName, 'delete', id);
       }
       const deleted = await graphql({
@@ -965,16 +1034,26 @@ const auth = new Proxy(
       return false;
     },
     redirectToLogin: async redirectUrl => {
-      if (isAmplifyRuntimeEnabled && canUseManagedAmplifyLogin) {
+      if (typeof window !== 'undefined' && isAmplifyRuntimeEnabled) {
         const targetUrl = redirectUrl || window.location.href;
-        sessionStorage.setItem('amplify_post_login_redirect', targetUrl);
-        await signInWithRedirect();
+        window.location.assign(buildLoginUrl(targetUrl));
         return;
       }
       if (legacyBase44?.auth?.redirectToLogin) {
         return legacyBase44.auth.redirectToLogin(redirectUrl);
       }
-      window.location.assign(window.location.origin);
+      if (typeof window !== 'undefined') {
+        window.location.assign(window.location.origin);
+      }
+    },
+    redirectToAppLogin: redirectUrl => {
+      if (typeof window === 'undefined') {
+        return Promise.resolve();
+      }
+
+      const targetUrl = redirectUrl || window.location.href;
+      window.location.assign(buildLoginUrl(targetUrl));
+      return Promise.resolve();
     },
     logout: async redirectUrl => {
       if (isAmplifyRuntimeEnabled && (await hasAmplifySession())) {
@@ -1062,10 +1141,7 @@ const createIntegrationEndpointProxy = packageName =>
           return undefined;
         }
 
-        return async data => {
-          const response = await invokeLegacyIntegration(packageName, endpointName, data);
-          return response.data;
-        };
+        return data => invokeIntegrationEndpoint(packageName, endpointName, data);
       },
     },
   );
@@ -1083,28 +1159,188 @@ const integrations = new Proxy(
   },
 );
 
-const fallbackProxy = groupName =>
-  new Proxy(
-    {},
-    {
-      get(_target, property) {
-        const legacyValue = legacyBase44?.[groupName]?.[property];
-        if (legacyValue !== undefined) {
-          return typeof legacyValue === 'function' ? legacyValue.bind(legacyBase44[groupName]) : legacyValue;
-        }
-        return async () => {
-          throw normalizeError(`The ${groupName}.${String(property)} operation is not available in Amplify mode without legacy Base44 runtime configuration.`);
-        };
-      },
-    },
-  );
+const agentConversationStore = new Map();
+
+const agentConversationSubscribers = new Map();
+
+const cloneAgentConversation = conversation => ({
+  ...conversation,
+  metadata: isPlainObject(conversation?.metadata) ? { ...conversation.metadata } : {},
+  messages: Array.isArray(conversation?.messages) ? conversation.messages.map(message => ({ ...message })) : [],
+});
+
+const generateAgentConversationId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `conversation-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
+const getAgentConversation = conversationOrId => {
+  const conversationId = typeof conversationOrId === 'string' ? conversationOrId : conversationOrId?.id;
+
+  if (!conversationId) {
+    throw normalizeError('A conversation id is required for agents operations.');
+  }
+
+  const conversation = agentConversationStore.get(conversationId);
+  if (!conversation) {
+    throw normalizeError(`Conversation ${conversationId} was not found.`);
+  }
+
+  return conversation;
+};
+
+const notifyAgentConversationSubscribers = conversationId => {
+  const subscribers = agentConversationSubscribers.get(conversationId);
+  const conversation = agentConversationStore.get(conversationId);
+
+  if (!subscribers?.size || !conversation) {
+    return;
+  }
+
+  const snapshot = cloneAgentConversation(conversation);
+  subscribers.forEach(callback => {
+    try {
+      callback(snapshot);
+    } catch {
+      // Ignore subscriber errors so they do not break chat updates.
+    }
+  });
+};
+
+const getAgentSiteName = () => {
+  if (typeof window === 'undefined') {
+    return 'HomeXLink';
+  }
+
+  const hostPrefix = window.location.hostname.split('.')[0] || 'HomeXLink';
+  return hostPrefix.charAt(0).toUpperCase() + hostPrefix.slice(1);
+};
+
+const buildAgentConversationPrompt = conversation => {
+  const currentUrl = typeof window !== 'undefined' ? window.location.href : null;
+  const recentMessages = conversation.messages
+    .slice(-12)
+    .map(message => `${message.role === 'assistant' ? 'Assistant' : 'User'}: ${message.content}`)
+    .join('\n\n');
+
+  return [
+    `You are a helpful website assistant for ${getAgentSiteName()}, a home management and real estate platform.`,
+    conversation?.metadata?.description ? `Conversation context: ${conversation.metadata.description}` : null,
+    currentUrl ? `Current page URL: ${currentUrl}` : null,
+    'Help users with navigation, features, onboarding, services, deals, insights, and property-management workflows.',
+    'Keep replies concise, practical, and accurate to the app as described by the conversation.',
+    'When suggesting internal navigation, use markdown links with href values like /Dashboard, /Services, /Deals, /Insights, /Profile, /Messages, or /PropertyCapture.',
+    'Do not claim you completed actions in the app. If unsure, say so briefly and offer the closest helpful next step.',
+    'Conversation so far:',
+    recentMessages || 'No prior messages yet.',
+    'Reply as the assistant to the latest user message.',
+  ].filter(Boolean).join('\n\n');
+};
+
+const extractAgentResponseText = response => {
+  if (typeof response === 'string') {
+    return response.trim();
+  }
+
+  if (!response || typeof response !== 'object') {
+    return '';
+  }
+
+  return [response.content, response.response, response.text, response.answer, response.message]
+    .find(value => typeof value === 'string' && value.trim()) || '';
+};
+
+const agentMethods = {
+  createConversation: async input => {
+    const conversation = {
+      id: generateAgentConversationId(),
+      agent_name: input?.agent_name || 'website_assistant',
+      metadata: isPlainObject(input?.metadata) ? { ...input.metadata } : {},
+      messages: [],
+    };
+
+    agentConversationStore.set(conversation.id, conversation);
+    return cloneAgentConversation(conversation);
+  },
+  getConversation: async conversationOrId => cloneAgentConversation(getAgentConversation(conversationOrId)),
+  subscribeToConversation: (conversationOrId, callback) => {
+    const conversation = getAgentConversation(conversationOrId);
+    const conversationId = conversation.id;
+    const subscribers = agentConversationSubscribers.get(conversationId) || new Set();
+
+    subscribers.add(callback);
+    agentConversationSubscribers.set(conversationId, subscribers);
+    callback(cloneAgentConversation(conversation));
+
+    return () => {
+      subscribers.delete(callback);
+      if (subscribers.size === 0) {
+        agentConversationSubscribers.delete(conversationId);
+      }
+    };
+  },
+  addMessage: async (conversationOrId, message) => {
+    const conversation = getAgentConversation(conversationOrId);
+    const content = String(message?.content || '').trim();
+
+    if (!content) {
+      throw normalizeError('Message content is required.');
+    }
+
+    conversation.messages = [...conversation.messages, {
+      role: message?.role === 'assistant' ? 'assistant' : 'user',
+      content,
+    }];
+    notifyAgentConversationSubscribers(conversation.id);
+
+    try {
+      const response = await invokeIntegrationEndpoint('Core', 'InvokeLLM', {
+        prompt: buildAgentConversationPrompt(conversation),
+      });
+
+      const assistantReply = extractAgentResponseText(response) || 'I’m sorry, I couldn’t generate a response right now.';
+      conversation.messages = [...conversation.messages, {
+        role: 'assistant',
+        content: assistantReply,
+      }];
+    } catch {
+      conversation.messages = [...conversation.messages, {
+        role: 'assistant',
+        content: 'I’m sorry, I’m having trouble responding right now. Please try again in a moment.',
+      }];
+    }
+
+    notifyAgentConversationSubscribers(conversation.id);
+    return cloneAgentConversation(conversation);
+  },
+};
+
+const agents = new Proxy(agentMethods, {
+  get(target, property) {
+    if (property in target) {
+      return target[property];
+    }
+
+    const legacyValue = legacyBase44?.agents?.[property];
+    if (legacyValue !== undefined) {
+      return typeof legacyValue === 'function' ? legacyValue.bind(legacyBase44.agents) : legacyValue;
+    }
+
+    return async () => {
+      throw normalizeError(`The agents.${String(property)} operation is not available in Amplify mode without legacy Base44 runtime configuration.`);
+    };
+  },
+});
 
 export const base44 = {
   auth,
   entities,
   functions,
   integrations,
-  agents: fallbackProxy('agents'),
+  agents,
   appLogs: legacyBase44?.appLogs || {
     logUserInApp: async () => null,
   },
