@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { updateCurrentUserProfile } from '@/api/base44Client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,7 @@ export default function SMSOptInModal({ isOpen, onClose, user }) {
 
   const handleSkip = async () => {
     try {
-      await base44.auth.updateMe({
+      await updateCurrentUserProfile({
         has_seen_sms_optin: true
       });
       onClose();
@@ -45,7 +45,7 @@ export default function SMSOptInModal({ isOpen, onClose, user }) {
         console.log('Could not fetch IP:', ipError);
       }
 
-      await base44.auth.updateMe({
+      await updateCurrentUserProfile({
         sms_phone_number: phoneNumber.trim(),
         sms_consent: true,
         sms_consent_date: new Date().toISOString(),

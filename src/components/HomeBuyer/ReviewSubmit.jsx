@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { redirectToAppLogin } from '@/api/base44Client';
+import { PendingUser } from '@/api/entities';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -25,7 +26,7 @@ export default function ReviewSubmit({ criteria, selectedHome, desiredChanges, o
 
     setSubmitting(true);
     try {
-      await base44.entities.PendingUser.create({
+      await PendingUser.create({
         email: userData.email,
         full_name: userData.full_name,
         phone: userData.phone,
@@ -61,7 +62,7 @@ export default function ReviewSubmit({ criteria, selectedHome, desiredChanges, o
           '&phone=' + encodeURIComponent(userData.phone || '') +
           '&type=first_time_buyer';
         
-        base44.auth.redirectToAppLogin(signupUrl);
+        void redirectToAppLogin(signupUrl);
       }, 2000);
       
     } catch (error) {

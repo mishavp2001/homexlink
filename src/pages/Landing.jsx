@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
-import { base44 } from '@/api/base44Client';
+import { hasAuthenticatedUser, redirectToAppLogin } from '@/api/base44Client';
+import { Category, PendingUser, Property } from '@/api/entities';
+import { getLocationFromIP, searchGooglePlaces } from '@/api/functions';
+import { InvokeLLM, UploadFile } from '@/api/integrations';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -149,38 +152,16 @@ export default function Landing() {
   };
 
   const handleLogin = async () => {
-    const isAuth = await base44.auth.isAuthenticated();
+    const isAuth = await hasAuthenticatedUser();
     if (isAuth) {
       navigate(createPageUrl('Dashboard'));
       return;
     }
-    /*if (isMobileApp()) {
-      const checkAuthAndRedirect = async () => {
-        try {
-          const isAuth = await base44.auth.isAuthenticated();
-          if (isAuth) {
-            navigate(createPageUrl('Dashboard'));
-          } else {
-            // For mobile app/webview, use /sign instead of /login
-            const authRoute = '/sign';
-            window.location.replace(window.location.origin + authRoute + '?next=' + encodeURIComponent(createPageUrl('Dashboard')));
-          }
-        } catch (error) {
-          const authRoute = '/sign';
-          window.location.replace(window.location.origin + authRoute + '?next=' + encodeURIComponent(createPageUrl('Dashboard')));
-        }
-      };
-
-      checkAuthAndRedirect();
-    } else {
-      //alert("Not mobile");
-      navigateToLogin();
-    }*/
     navigateToLogin();
   };
 
   const handleSignUp = async () => {
-    const isAuth = await base44.auth.isAuthenticated();
+    const isAuth = await hasAuthenticatedUser();
     if (isAuth) {
       navigate(createPageUrl('Dashboard'));
       return;
@@ -201,7 +182,7 @@ export default function Landing() {
     } else {
       //alert("Not mobile");
       const signupUrl = window.location.origin + createPageUrl('Dashboard') + '?signup=true';
-      base44.auth.redirectToAppLogin(signupUrl);
+      void redirectToAppLogin(signupUrl);
     }
   };
 
@@ -219,7 +200,7 @@ export default function Landing() {
 
     try {
       // First, get AI analysis of the project
-      const response = await base44.integrations.Core.InvokeLLM({
+      const response = await InvokeLLM({
         prompt: `You are a home maintenance and construction expert. Analyze this project description and provide:
 1. Cost estimate
 2. Project classification
@@ -263,7 +244,7 @@ Provide your response in this exact JSON format:
       let placesResult = { places: [] };
       if (projectLocation.trim() && response.service_category) {
         try {
-          const placesResponse = await base44.functions.invoke('searchGooglePlaces', {
+          const placesResponse = await searchGooglePlaces({
             query: `${response.service_category} ${projectLocation}`,
             location: projectLocation
           });
@@ -289,25 +270,25 @@ Provide your response in this exact JSON format:
 
   const { data: dealCategories = [] } = useQuery({
     queryKey: ['dealCategories'],
-    queryFn: () => base44.entities.Category.filter({ type: 'deal_type', is_active: true }),
+    queryFn: () => Category.filter({ type: 'deal_type', is_active: true }),
     staleTime: 60000
   });
 
   const { data: serviceDealCategories = [] } = useQuery({
     queryKey: ['serviceDealCategories'],
-    queryFn: () => base44.entities.Category.filter({ type: 'service_type', is_active: true }),
+    queryFn: () => Category.filter({ type: 'service_type', is_active: true }),
     staleTime: 60000
   });
 
   const { data: serviceCategories = [] } = useQuery({
     queryKey: ['serviceCategories'],
-    queryFn: () => base44.entities.Category.filter({ type: 'service_type', is_active: true }),
+    queryFn: () => Category.filter({ type: 'service_type', is_active: true }),
     staleTime: 60000
   });
 
   const { data: insightCategories = [] } = useQuery({
     queryKey: ['insightCategories'],
-    queryFn: () => base44.entities.Category.filter({ type: 'insight_type', is_active: true }),
+    queryFn: () => Category.filter({ type: 'insight_type', is_active: true }),
     staleTime: 60000
   });
 
@@ -333,7 +314,7 @@ Provide your response in this exact JSON format:
  useEffect(() => {
     const checkAuth = async () => {
       try {
-        const isAuth = await base44.auth.isAuthenticated();
+        const isAuth = await hasAuthenticatedUser();
         if (isAuth) {
           navigate(createPageUrl('Dashboard'));
         }
@@ -358,7 +339,7 @@ Provide your response in this exact JSON format:
       if (projectLocation || locationLoaded) return;
 
       try {
-        const response = await base44.functions.invoke('getLocationFromIP');
+        const response = await getLocationFromIP();
         if (response.data.success && response.data.location) {
           setProjectLocation(response.data.location);
           localStorage.setItem('projectLocation', response.data.location);
@@ -760,7 +741,7 @@ Provide your response in this exact JSON format:
                                     if (files.length === 0) return;
                                     setUploadingPhotos(true);
                                     try {
-                                      const uploadPromises = files.map((file) => base44.integrations.Core.UploadFile({ file }));
+                                      const uploadPromises = files.map(file => UploadFile({ file }));
                                       const results = await Promise.all(uploadPromises);
                                       const urls = results.map((r) => r.file_url);
                                       setProjectPhotos([...projectPhotos, ...urls].slice(0, 3));
@@ -1342,7 +1323,7 @@ function AIAssistantModalContent({ onClose, initialInstructions = '', initialPri
 
   const { data: serviceCategories = [] } = useQuery({
     queryKey: ['serviceCategories'],
-    queryFn: () => base44.entities.Category.filter({ type: 'service_type', is_active: true }),
+    queryFn: () => Category.filter({ type: 'service_type', is_active: true }),
     staleTime: 60000
   });
 
@@ -1371,7 +1352,7 @@ Customer Message: ${testInput}
 
 Provide a helpful response with quotes when relevant.`;
 
-      const response = await base44.integrations.Core.InvokeLLM({ prompt });
+      const response = await InvokeLLM({ prompt });
 
       const assistantMessage = { role: 'assistant', content: response };
       setTestMessages([...testMessages, userMessage, assistantMessage]);
@@ -1391,7 +1372,7 @@ Provide a helpful response with quotes when relevant.`;
 
     setCreating(true);
     try {
-      await base44.entities.PendingUser.create({
+      await PendingUser.create({
         email: profileData.email,
         full_name: profileData.business_name,
         phone: profileData.phone,
@@ -1411,7 +1392,7 @@ Provide a helpful response with quotes when relevant.`;
       '&name=' + encodeURIComponent(profileData.business_name) +
       '&email=' + encodeURIComponent(profileData.email);
 
-      base44.auth.redirectToAppLogin(signupUrl);
+      void redirectToAppLogin(signupUrl);
     } catch (error) {
       console.error('Error:', error);
       alert('An error occurred. Please try again.');
@@ -1807,7 +1788,7 @@ function PropertyCaptureModalContent({ initialAddress, onClose }) {
       if (initialAddress) {
         setChecking(true);
         try {
-          const properties = await base44.entities.Property.filter({ address: initialAddress });
+          const properties = await Property.filter({ address: initialAddress });
 
           if (properties && properties.length > 0) {
             setExistingProperty(properties[0]);

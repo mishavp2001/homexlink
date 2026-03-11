@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { redirectToAppLogin } from '@/api/base44Client';
+import { Category, PendingUser } from '@/api/entities';
+import { UploadFile } from '@/api/integrations';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -20,7 +22,7 @@ export default function ProDealModal({ onClose }) {
 
   const { data: serviceCategories = [] } = useQuery({
     queryKey: ['serviceCategories'],
-    queryFn: () => base44.entities.Category.filter({ type: 'service_type', is_active: true }),
+    queryFn: () => Category.filter({ type: 'service_type', is_active: true }),
     staleTime: 60000
   });
 
@@ -28,7 +30,7 @@ export default function ProDealModal({ onClose }) {
     const files = Array.from(e.target.files);
     if (!files.length) return;
     setUploadingPhotos(true);
-    const results = await Promise.all(files.map(f => base44.integrations.Core.UploadFile({ file: f })));
+    const results = await Promise.all(files.map(f => UploadFile({ file: f })));
     setDealData(d => ({ ...d, photo_urls: [...d.photo_urls, ...results.map(r => r.file_url)] }));
     setUploadingPhotos(false);
   };
@@ -41,8 +43,8 @@ export default function ProDealModal({ onClose }) {
   const handleCreateAccount = async () => {
     if (!profileData.business_name || !profileData.email) { alert('Please fill in all required fields'); return; }
     setCreating(true);
-    await base44.entities.PendingUser.create({ email: profileData.email, full_name: profileData.business_name, phone: profileData.phone, user_type: 'service_provider', deal_data: dealData, status: 'pending' });
-    base44.auth.redirectToAppLogin(window.location.origin + createPageUrl('Dashboard') + '?signup=true&name=' + encodeURIComponent(profileData.business_name) + '&email=' + encodeURIComponent(profileData.email));
+    await PendingUser.create({ email: profileData.email, full_name: profileData.business_name, phone: profileData.phone, user_type: 'service_provider', deal_data: dealData, status: 'pending' });
+    void redirectToAppLogin(window.location.origin + createPageUrl('Dashboard') + '?signup=true&name=' + encodeURIComponent(profileData.business_name) + '&email=' + encodeURIComponent(profileData.email));
   };
 
   const steps = [{ number: 1, title: 'Deal Info' }, { number: 2, title: 'Create Account' }];

@@ -1,13 +1,50 @@
 import { Amplify } from 'aws-amplify';
+import amplifyOutputs from '../../amplify_outputs.json';
 
+/**
+ * @typedef {{
+ *   domain?: string,
+ *   scopes?: string[],
+ *   redirect_sign_in_uri?: string[],
+ *   redirect_sign_out_uri?: string[],
+ *   response_type?: string,
+ *   identity_providers?: string | string[],
+ * }} AmplifyOutputsOAuth
+ */
+
+/**
+ * @typedef {{
+ *   aws_region?: string,
+ *   user_pool_id?: string,
+ *   user_pool_client_id?: string,
+ *   identity_pool_id?: string,
+ *   oauth?: AmplifyOutputsOAuth,
+ * }} AmplifyOutputsAuth
+ */
+
+/**
+ * @typedef {{
+ *   aws_region?: string,
+ *   url?: string,
+ *   api_key?: string,
+ *   default_authorization_type?: string,
+ * }} AmplifyOutputsData
+ */
+
+/** @param {string | string[] | null | undefined} value */
 const csvToList = value =>
   String(value || '')
     .split(',')
     .map(entry => entry.trim())
     .filter(Boolean);
 
+/** @param {...(string | null | undefined)} values */
 const firstNonEmpty = (...values) => values.find(value => Boolean(value)) || '';
 
+/** @param {...(string[] | null | undefined)} values */
+const firstNonEmptyList = (...values) => values.find(value => Array.isArray(value) && value.length) || [];
+
+/** @param {string | null | undefined} value */
 const mapAuthMode = value => {
   const normalized = String(value || '').trim().toUpperCase();
 
@@ -33,17 +70,53 @@ const mapAuthMode = value => {
   }
 };
 
-const env = /** @type {Record<string, string | undefined>} */ ((/** @type {any} */ (import.meta)).env || {});
+/** @param {string | null | undefined} value */
+const mapOAuthResponseType = value => {
+  const normalized = String(value || '').trim().toLowerCase();
 
-const amplifyOutputsModules = import.meta.glob('../../amplify_outputs.json', {
-  eager: true,
-  import: 'default',
-});
+  if (normalized === 'token') {
+    return 'token';
+  }
 
-const [amplifyOutputs = null] = Object.values(amplifyOutputsModules);
+  return normalized ? 'code' : '';
+};
 
-const outputsAuth = amplifyOutputs?.auth || {};
-const outputsData = amplifyOutputs?.data || {};
+/** @param {string | null | undefined} value */
+const mapOAuthProvider = value => {
+  const normalized = String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
+
+  switch (normalized) {
+    case 'GOOGLE':
+      return 'Google';
+    case 'FACEBOOK':
+      return 'Facebook';
+    case 'LOGIN_WITH_AMAZON':
+    case 'AMAZON':
+      return 'Amazon';
+    case 'SIGN_IN_WITH_APPLE':
+    case 'APPLE':
+      return 'Apple';
+    default:
+      return '';
+  }
+};
+
+/** @param {string | string[] | null | undefined} value */
+const mapOAuthProviders = value => {
+  const values = Array.isArray(value) ? value : csvToList(value);
+  return [...new Set(values.map(mapOAuthProvider).filter(Boolean))];
+};
+
+const importMeta = /** @type {{ env?: Record<string, string | undefined> }} */ (/** @type {unknown} */ (import.meta));
+const env = /** @type {Record<string, string | undefined>} */ (importMeta.env || {});
+
+const amplifyOutputsConfig = /** @type {{ auth?: AmplifyOutputsAuth, data?: AmplifyOutputsData }} */ (amplifyOutputs || {});
+const outputsAuth = amplifyOutputsConfig.auth || {};
+const outputsData = amplifyOutputsConfig.data || {};
+const outputsOAuth = outputsAuth.oauth || {};
 
 const envRuntimeConfig = {
   region: env.VITE_AMPLIFY_REGION || env.VITE_AWS_REGION || env.VITE_AWS_PROJECT_REGION || '',
@@ -58,7 +131,8 @@ const envRuntimeConfig = {
   oauthScopes: csvToList(env.VITE_AMPLIFY_OAUTH_SCOPES || 'openid,email,profile'),
   redirectSignIn: csvToList(env.VITE_AMPLIFY_REDIRECT_SIGN_IN),
   redirectSignOut: csvToList(env.VITE_AMPLIFY_REDIRECT_SIGN_OUT),
-  oauthResponseType: env.VITE_AMPLIFY_OAUTH_RESPONSE_TYPE || 'code',
+  oauthResponseType: mapOAuthResponseType(env.VITE_AMPLIFY_OAUTH_RESPONSE_TYPE) || 'code',
+  oauthProviders: mapOAuthProviders(env.VITE_AMPLIFY_OAUTH_PROVIDERS),
 };
 
 export const amplifyRuntimeConfig = {
@@ -70,11 +144,12 @@ export const amplifyRuntimeConfig = {
   graphqlRegion: firstNonEmpty(outputsData.aws_region, outputsAuth.aws_region, envRuntimeConfig.graphqlRegion),
   apiKey: firstNonEmpty(outputsData.api_key, envRuntimeConfig.apiKey),
   defaultAuthMode: firstNonEmpty(mapAuthMode(outputsData.default_authorization_type), envRuntimeConfig.defaultAuthMode, 'userPool'),
-  oauthDomain: envRuntimeConfig.oauthDomain,
-  oauthScopes: envRuntimeConfig.oauthScopes,
-  redirectSignIn: envRuntimeConfig.redirectSignIn,
-  redirectSignOut: envRuntimeConfig.redirectSignOut,
-  oauthResponseType: envRuntimeConfig.oauthResponseType,
+  oauthDomain: firstNonEmpty(outputsOAuth.domain, envRuntimeConfig.oauthDomain),
+  oauthScopes: firstNonEmptyList(outputsOAuth.scopes, envRuntimeConfig.oauthScopes),
+  redirectSignIn: firstNonEmptyList(outputsOAuth.redirect_sign_in_uri, envRuntimeConfig.redirectSignIn),
+  redirectSignOut: firstNonEmptyList(outputsOAuth.redirect_sign_out_uri, envRuntimeConfig.redirectSignOut),
+  oauthResponseType: firstNonEmpty(mapOAuthResponseType(outputsOAuth.response_type), envRuntimeConfig.oauthResponseType),
+  oauthProviders: firstNonEmptyList(mapOAuthProviders(outputsOAuth.identity_providers), envRuntimeConfig.oauthProviders),
 };
 
 export const isAmplifyRuntimeEnabled = Boolean(
@@ -84,7 +159,7 @@ export const isAmplifyRuntimeEnabled = Boolean(
     amplifyRuntimeConfig.graphqlEndpoint,
 );
 
-export const canUseManagedAmplifyLogin = Boolean(
+const hasAmplifyOauthConfig = Boolean(
   isAmplifyRuntimeEnabled &&
     amplifyRuntimeConfig.oauthDomain &&
     amplifyRuntimeConfig.redirectSignIn.length &&
@@ -119,13 +194,16 @@ const buildAmplifyConfig = () => {
     },
   });
 
-  if (canUseManagedAmplifyLogin) {
+  if (hasAmplifyOauthConfig) {
     config.Auth.Cognito.loginWith.oauth = {
       domain: amplifyRuntimeConfig.oauthDomain,
       scopes: amplifyRuntimeConfig.oauthScopes,
       redirectSignIn: amplifyRuntimeConfig.redirectSignIn,
       redirectSignOut: amplifyRuntimeConfig.redirectSignOut,
       responseType: amplifyRuntimeConfig.oauthResponseType,
+      ...(amplifyRuntimeConfig.oauthProviders.length
+        ? { providers: amplifyRuntimeConfig.oauthProviders }
+        : {}),
     };
   }
 

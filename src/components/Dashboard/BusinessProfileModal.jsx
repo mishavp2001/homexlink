@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile, updateCurrentUserProfile } from '@/api/base44Client';
+import { Category, ProviderSettings } from '@/api/entities';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +25,7 @@ export default function BusinessProfileModal({ isOpen, onClose, onComplete }) {
 
   useEffect(() => {
     const loadCategories = async () => {
-      const cats = await base44.entities.Category.filter({ type: 'service_type', is_active: true });
+      const cats = await Category.filter({ type: 'service_type', is_active: true });
       if (cats && cats.length > 0) {
         setCategories(cats);
       } else {
@@ -50,7 +51,7 @@ export default function BusinessProfileModal({ isOpen, onClose, onComplete }) {
     setLoading(true);
 
     try {
-      await base44.auth.updateMe({
+      await updateCurrentUserProfile({
         business_name: formData.business_name,
         phone: formData.phone,
         service_types: [formData.service_category],
@@ -64,8 +65,8 @@ export default function BusinessProfileModal({ isOpen, onClose, onComplete }) {
 
       // Create ProviderSettings for billing
       try {
-        const user = await base44.auth.me();
-        await base44.entities.ProviderSettings.create({
+        const user = await getCurrentUserProfile();
+        await ProviderSettings.create({
           provider_email: user.email,
           billing_email: user.email,
           status: 'active'

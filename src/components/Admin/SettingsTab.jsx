@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { Settings } from '@/api/entities';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -13,7 +13,7 @@ export default function SettingsTab() {
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ['settings'],
-    queryFn: () => base44.entities.Settings.list(),
+    queryFn: () => Settings.list(),
     initialData: []
   });
 
@@ -28,9 +28,9 @@ export default function SettingsTab() {
   const updateSettingMutation = useMutation({
     mutationFn: async (data) => {
       if (domainSetting) {
-        return await base44.entities.Settings.update(domainSetting.id, data);
+        return await Settings.update(domainSetting.id, data);
       } else {
-        return await base44.entities.Settings.create(data);
+        return await Settings.create(data);
       }
     },
     onSuccess: () => {

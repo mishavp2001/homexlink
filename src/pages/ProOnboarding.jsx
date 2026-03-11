@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin, updateCurrentUserProfile } from '@/api/base44Client';
+import { ProviderSettings } from '@/api/entities';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { createPageUrl } from '@/utils';
@@ -13,10 +14,10 @@ export default function ProOnboarding() {
   useEffect(() => {
     const completeOnboarding = async () => {
       try {
-        const user = await base44.auth.me();
+        const user = await getCurrentUserProfile();
         if (!user) {
           const currentUrl = window.location.href;
-          base44.auth.redirectToAppLogin(currentUrl);
+          void redirectToAppLogin(currentUrl);
           return;
         }
 
@@ -29,7 +30,7 @@ export default function ProOnboarding() {
         const pendingData = JSON.parse(pendingDataStr);
 
         // Update user with business data
-        await base44.auth.updateMe({
+        await updateCurrentUserProfile({
           business_name: pendingData.business_name,
           phone: pendingData.phone,
           service_types: pendingData.service_types,
@@ -43,7 +44,7 @@ export default function ProOnboarding() {
 
         // Create ProviderSettings for billing
         try {
-          await base44.entities.ProviderSettings.create({
+          await ProviderSettings.create({
             provider_email: user.email,
             billing_email: user.email,
             status: 'active'

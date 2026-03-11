@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
+import { UserProfile } from '@/api/entities';
 import { useQuery } from '@tanstack/react-query';
 import Navigation from '../components/Navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,7 +29,7 @@ export default function ConsentRecords() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await getCurrentUserProfile();
         setUser(currentUser);
       } catch (error) {
         console.error('Not authenticated');
@@ -42,7 +43,7 @@ export default function ConsentRecords() {
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['consentRecords'],
     queryFn: async () => {
-      const allUsers = await base44.entities.User.list();
+      const allUsers = await UserProfile.list();
       return allUsers.filter(u => u.sms_consent || u.sms_opt_in);
     },
     enabled: !!user && user.role === 'admin'
@@ -106,7 +107,9 @@ export default function ConsentRecords() {
           <Shield className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
           <p className="text-gray-600 mb-6">Please sign in to view consent records</p>
-          <Button onClick={() => base44.auth.redirectToAppLogin()}>
+          <Button onClick={() => {
+            void redirectToAppLogin();
+          }}>
             Sign In
           </Button>
         </div>

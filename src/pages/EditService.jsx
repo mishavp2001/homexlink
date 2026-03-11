@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
+import { Category, ServiceListing } from '@/api/entities';
+import { UploadFile } from '@/api/integrations';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import ReactQuill from 'react-quill';
@@ -45,9 +47,9 @@ export default function EditService() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await getCurrentUserProfile();
         setUser(currentUser);
-        if (!currentUser) base44.auth.redirectToAppLogin(window.location.href);
+        if (!currentUser) void redirectToAppLogin(window.location.href);
         else if (!serviceId) {
            setServiceForm(prev => ({
              ...prev,
@@ -56,7 +58,7 @@ export default function EditService() {
            }));
         }
       } catch (error) {
-        base44.auth.redirectToAppLogin(window.location.href);
+        void redirectToAppLogin(window.location.href);
       }
     };
     loadUser();
@@ -66,7 +68,7 @@ export default function EditService() {
     queryKey: ['service', serviceId],
     queryFn: async () => {
       if (!serviceId) return null;
-      const services = await base44.entities.ServiceListing.filter({ id: serviceId });
+      const services = await ServiceListing.filter({ id: serviceId });
       return services[0];
     },
     enabled: !!serviceId
@@ -74,7 +76,7 @@ export default function EditService() {
 
   const { data: categories } = useQuery({
     queryKey: ['serviceCategories'],
-    queryFn: () => base44.entities.Category.filter({ type: 'service_type', is_active: true }),
+    queryFn: () => Category.filter({ type: 'service_type', is_active: true }),
     initialData: []
   });
 
@@ -85,16 +87,16 @@ export default function EditService() {
   }, [service]);
 
   const mutation = useMutation({
-    mutationFn: (data) => {
+    mutationFn: data => {
       const formattedData = {
         ...data,
         years_experience: parseFloat(data.years_experience) || 0,
         hourly_rate: parseFloat(data.hourly_rate) || 0
       };
       if (serviceId) {
-        return base44.entities.ServiceListing.update(serviceId, formattedData);
+        return ServiceListing.update(serviceId, formattedData);
       }
-      return base44.entities.ServiceListing.create(formattedData);
+      return ServiceListing.create(formattedData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['myServices']);
@@ -108,7 +110,7 @@ export default function EditService() {
     if (!file) return;
     setUploadingPhoto(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await UploadFile({ file });
       setServiceForm({ ...serviceForm, photo_url: file_url });
     } catch (error) {
       console.error(error);

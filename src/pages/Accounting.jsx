@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile } from '@/api/base44Client';
+import { Property, Transaction } from '@/api/entities';
+import { UploadFile } from '@/api/integrations';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -76,7 +78,7 @@ export default function Accounting() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await getCurrentUserProfile();
         setUser(currentUser);
       } catch (error) {
         console.error('Not authenticated', error);
@@ -90,7 +92,7 @@ export default function Accounting() {
   const { data: property, isLoading: loadingProperty } = useQuery({
     queryKey: ['property', propertyId],
     queryFn: async () => {
-      const props = await base44.entities.Property.filter({ id: propertyId });
+      const props = await Property.filter({ id: propertyId });
       return props[0];
     },
     enabled: !!propertyId
@@ -98,7 +100,7 @@ export default function Accounting() {
 
   const { data: transactions, isLoading } = useQuery({
     queryKey: ['transactions', propertyId],
-    queryFn: () => base44.entities.Transaction.filter({ property_id: propertyId }, '-date'),
+    queryFn: () => Transaction.filter({ property_id: propertyId }, '-date'),
     enabled: !!propertyId,
     initialData: []
   });
@@ -113,7 +115,7 @@ export default function Accounting() {
 
     setUploadingReceipt(true);
     try {
-      const result = await base44.integrations.Core.UploadFile({ file });
+      const result = await UploadFile({ file });
       setFormData({ ...formData, receipt_url: result.file_url });
     } catch (error) {
       console.error('Upload error:', error);
@@ -122,7 +124,7 @@ export default function Accounting() {
   };
 
   const createTransactionMutation = useMutation({
-    mutationFn: (transactionData) => base44.entities.Transaction.create({
+    mutationFn: transactionData => Transaction.create({
       ...transactionData,
       property_id: propertyId
     }),
@@ -170,7 +172,7 @@ export default function Accounting() {
   });
 
   const deleteTransactionMutation = useMutation({
-    mutationFn: (id) => base44.entities.Transaction.delete(id),
+    mutationFn: id => Transaction.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['transactions']);
     }

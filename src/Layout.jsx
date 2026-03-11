@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { AuthProvider } from '@/components/lib/AuthContext';
 import { TranslationProvider } from '@/components/lib/TranslationContext';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile } from '@/api/base44Client';
+import { PageMetadata } from '@/api/entities';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import BottomNavigation from '@/components/BottomNavigation';
@@ -19,7 +20,7 @@ export default function Layout({ children, currentPageName }) {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await getCurrentUserProfile();
         setUser(currentUser);
       } catch (error) {
         setUser(null);
@@ -32,7 +33,7 @@ export default function Layout({ children, currentPageName }) {
     // Fetch AI-generated metadata for current page
     const fetchMetadata = async () => {
       try {
-        const metadata = await base44.entities.PageMetadata.filter({ 
+        const metadata = await PageMetadata.filter({ 
           page_name: currentPageName 
         });
         if (metadata && metadata.length > 0) {

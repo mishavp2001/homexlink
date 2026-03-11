@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { redirectToAppLogin } from '@/api/base44Client';
+import { Deal, Review, ServiceListing } from '@/api/entities';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -22,7 +23,7 @@ export default function ServiceDetailsModal({ service, isOpen, onClose, currentU
     queryKey: ['reviews', service?.id],
     queryFn: async () => {
       if (!service) return [];
-      const allReviews = await base44.entities.Review.filter(
+      const allReviews = await Review.filter(
         { service_listing_id: service.id },
         '-created_date'
       );
@@ -36,7 +37,7 @@ export default function ServiceDetailsModal({ service, isOpen, onClose, currentU
     queryKey: ['providerDeals', service?.expert_email],
     queryFn: async () => {
       if (!service) return [];
-      return await base44.entities.Deal.filter({ 
+      return await Deal.filter({ 
         user_email: service.expert_email,
         status: 'active'
       }, '-created_date');
@@ -46,14 +47,14 @@ export default function ServiceDetailsModal({ service, isOpen, onClose, currentU
 
   const createReviewMutation = useMutation({
     mutationFn: async (reviewData) => {
-      const review = await base44.entities.Review.create(reviewData);
+      const review = await Review.create(reviewData);
       
       // Update service listing with new average
       const newReviewCount = (service.review_count || 0) + 1;
       const currentTotal = (service.average_rating || 0) * (service.review_count || 0);
       const newAverage = (currentTotal + reviewData.rating) / newReviewCount;
       
-      await base44.entities.ServiceListing.update(service.id, {
+      await ServiceListing.update(service.id, {
         average_rating: parseFloat(newAverage.toFixed(2)),
         review_count: newReviewCount
       });
@@ -71,7 +72,7 @@ export default function ServiceDetailsModal({ service, isOpen, onClose, currentU
   const markHelpfulMutation = useMutation({
     mutationFn: (reviewId) => {
       const review = reviews.find(r => r.id === reviewId);
-      return base44.entities.Review.update(reviewId, {
+      return Review.update(reviewId, {
         helpful_count: (review.helpful_count || 0) + 1
       });
     },
@@ -83,7 +84,7 @@ export default function ServiceDetailsModal({ service, isOpen, onClose, currentU
   const handleSubmitReview = (reviewData) => {
     if (!currentUser) {
       alert('Please sign in to leave a review');
-      base44.auth.redirectToAppLogin(window.location.href);
+      void redirectToAppLogin(window.location.href);
       return;
     }
 

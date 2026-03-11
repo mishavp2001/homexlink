@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { Deal, Review, ServiceListing } from '@/api/entities';
 import { useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,7 +25,7 @@ export default function PublicProfile() {
     queryFn: async () => {
       if (!userEmail) return null;
       
-      const listings = await base44.entities.ServiceListing.filter({ 
+      const listings = await ServiceListing.filter({ 
         expert_email: userEmail,
         status: 'active'
       });
@@ -42,7 +42,7 @@ export default function PublicProfile() {
     queryKey: ['userServices', userEmail],
     queryFn: async () => {
       if (!userEmail) return [];
-      return await base44.entities.ServiceListing.filter({ 
+      return await ServiceListing.filter({ 
         expert_email: userEmail, 
         status: 'active' 
       });
@@ -55,7 +55,7 @@ export default function PublicProfile() {
     queryKey: ['userDeals', userEmail],
     queryFn: async () => {
       if (!userEmail) return [];
-      return await base44.entities.Deal.filter({ 
+      return await Deal.filter({ 
         user_email: userEmail, 
         status: 'active' 
       });
@@ -69,7 +69,7 @@ export default function PublicProfile() {
     queryFn: async () => {
       if (!userServices || userServices.length === 0) return [];
       const serviceIds = userServices.map(s => s.id);
-      const reviews = await base44.entities.Review.list();
+      const reviews = await Review.list();
       return reviews.filter(r => serviceIds.includes(r.service_listing_id));
     },
     enabled: userServices.length > 0,

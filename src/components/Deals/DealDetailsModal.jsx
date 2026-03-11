@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { base44, redirectToAppLogin } from '@/api/base44Client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -40,7 +40,7 @@ export default function DealDetailsModal({ deal, isOpen, onClose, isOwner, onEdi
 
   const handleSendMessage = () => {
     if (!currentUser) {
-      base44.auth.redirectToAppLogin(window.location.href);
+      void redirectToAppLogin(window.location.href);
       return;
     }
 
@@ -198,7 +198,7 @@ This is an automated message from HomeXREI.
   const handleOfferSubmit = (offerData) => {
     if (!currentUser) {
       alert('Please sign in to make an offer');
-      base44.auth.redirectToAppLogin(window.location.href);
+      void redirectToAppLogin(window.location.href);
       return;
     }
     
@@ -468,7 +468,7 @@ This is an automated message from HomeXREI.
               onClick={async () => {
                 if (!currentUser) {
                   alert('Please sign in to purchase this deal');
-                  base44.auth.redirectToAppLogin(window.location.href);
+                  void redirectToAppLogin(window.location.href);
                   return;
                 }
                 
@@ -499,7 +499,7 @@ This is an automated message from HomeXREI.
               onClick={() => {
                 if (!currentUser) {
                   alert('Please sign in to make an offer');
-                  base44.auth.redirectToAppLogin(window.location.href);
+                  void redirectToAppLogin(window.location.href);
                   return;
                 }
                 setShowOfferForm(true);

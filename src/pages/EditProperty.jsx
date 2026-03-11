@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
+import { Property, PropertyComponent } from '@/api/entities';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -29,11 +30,11 @@ export default function EditProperty() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await getCurrentUserProfile();
         setUser(currentUser);
-        if (!currentUser) base44.auth.redirectToAppLogin(window.location.href);
+        if (!currentUser) void redirectToAppLogin(window.location.href);
       } catch (error) {
-        base44.auth.redirectToAppLogin(window.location.href);
+        void redirectToAppLogin(window.location.href);
       }
     };
     loadUser();
@@ -43,7 +44,7 @@ export default function EditProperty() {
     queryKey: ['property', propertyId],
     queryFn: async () => {
       if (!propertyId) return null;
-      const props = await base44.entities.Property.filter({ id: propertyId });
+      const props = await Property.filter({ id: propertyId });
       return props[0];
     },
     enabled: !!propertyId
@@ -51,7 +52,7 @@ export default function EditProperty() {
 
   const { data: components, refetch: refetchComponents } = useQuery({
     queryKey: ['components', propertyId],
-    queryFn: () => base44.entities.PropertyComponent.filter({ property_id: propertyId }),
+    queryFn: () => PropertyComponent.filter({ property_id: propertyId }),
     enabled: !!propertyId,
     initialData: []
   });
@@ -61,7 +62,7 @@ export default function EditProperty() {
   }, [property]);
 
   const updatePropertyMutation = useMutation({
-    mutationFn: (data) => base44.entities.Property.update(propertyId, data),
+    mutationFn: data => Property.update(propertyId, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['property', propertyId]);
       alert('Property updated successfully');
@@ -69,8 +70,8 @@ export default function EditProperty() {
   });
 
   const saveSingleComponentMutation = useMutation({
-    mutationFn: async (componentData) => {
-      return base44.entities.PropertyComponent.create({
+    mutationFn: async componentData => {
+      return PropertyComponent.create({
         property_id: propertyId,
         component_type: componentData.component_type,
         description: componentData.description,
@@ -89,8 +90,8 @@ export default function EditProperty() {
   });
 
   const updateComponentMutation = useMutation({
-    mutationFn: async (componentData) => {
-      return base44.entities.PropertyComponent.update(editingComponent.id, {
+    mutationFn: async componentData => {
+      return PropertyComponent.update(editingComponent.id, {
         component_type: componentData.component_type,
         description: componentData.description,
         photo_urls: componentData.photo_urls,
@@ -108,7 +109,7 @@ export default function EditProperty() {
   });
 
   const deleteComponentMutation = useMutation({
-    mutationFn: (id) => base44.entities.PropertyComponent.delete(id),
+    mutationFn: id => PropertyComponent.delete(id),
     onSuccess: () => refetchComponents()
   });
 

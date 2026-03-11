@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile } from '@/api/base44Client';
+import { verifyPayment } from '@/api/functions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CheckCircle2, Loader2, XCircle, CreditCard, Receipt } from 'lucide-react';
@@ -26,10 +27,10 @@ export default function PaymentSuccess() {
           return;
         }
 
-        const currentUser = await base44.auth.me();
+        const currentUser = await getCurrentUserProfile();
         setUser(currentUser);
 
-        const response = await base44.functions.invoke('verifyPayment', { sessionId });
+        const response = await verifyPayment({ sessionId });
 
         if (response.data.success) {
           setSuccess(true);

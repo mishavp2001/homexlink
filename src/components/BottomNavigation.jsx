@@ -4,7 +4,7 @@ import { createPageUrl } from '@/utils';
 import { Home, DollarSign, Wrench, Lightbulb } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { Message } from '@/api/entities';
 
 export default function BottomNavigation({ user }) {
   const location = useLocation();
@@ -14,7 +14,7 @@ export default function BottomNavigation({ user }) {
     queryKey: ['unreadMessages', user?.email],
     queryFn: async () => {
       if (!user) return 0;
-      const messages = await base44.entities.Message.list();
+      const messages = await Message.list();
       const received = messages.filter(m => 
         m.recipient_email === user.email && !m.is_read
       );

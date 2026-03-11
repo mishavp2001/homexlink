@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { Deal, Property, ServiceListing } from '@/api/entities';
+import { UploadFile } from '@/api/integrations';
 import { useQuery } from '@tanstack/react-query';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
@@ -77,7 +78,7 @@ export default function DealForm({ deal, onSubmit, onCancel, dealTypeCategories,
   // Fetch user's properties if logged in and posting property sale
   const { data: userProperties } = useQuery({
     queryKey: ['userProperties', currentUser?.email],
-    queryFn: () => currentUser ? base44.entities.Property.filter({ user_email: currentUser.email }) : [],
+    queryFn: () => currentUser ? Property.filter({ user_email: currentUser.email }) : [],
     // Enabled only for 'property_sales' to align with current handlePropertySelect logic which uses appraised_value and "for Sale" title
     enabled: !!currentUser && formData.deal_type === 'property_sales',
     initialData: []
@@ -86,7 +87,7 @@ export default function DealForm({ deal, onSubmit, onCancel, dealTypeCategories,
   // Fetch user's service DEALS (not service listings) for additional services on Airbnb
   const { data: userServiceDeals = [] } = useQuery({
     queryKey: ['userServiceDeals', currentUser?.email],
-    queryFn: () => currentUser ? base44.entities.Deal.filter({ 
+    queryFn: () => currentUser ? Deal.filter({ 
       user_email: currentUser.email, 
       deal_type: 'service_deal',
       status: 'active'
@@ -98,7 +99,7 @@ export default function DealForm({ deal, onSubmit, onCancel, dealTypeCategories,
   // Fetch user's service listings to check if they're a service provider
   const { data: userServiceListings = [] } = useQuery({
     queryKey: ['userServiceListings', currentUser?.email],
-    queryFn: () => currentUser ? base44.entities.ServiceListing.filter({ expert_email: currentUser.email }) : [],
+    queryFn: () => currentUser ? ServiceListing.filter({ expert_email: currentUser.email }) : [],
     enabled: !!currentUser,
     initialData: []
   });
@@ -215,7 +216,7 @@ export default function DealForm({ deal, onSubmit, onCancel, dealTypeCategories,
     setUploading(true);
     try {
       const uploadPromises = files.map(file =>
-        base44.integrations.Core.UploadFile({ file })
+        UploadFile({ file })
       );
       const results = await Promise.all(uploadPromises);
       const urls = results.map(r => r.file_url);
@@ -351,7 +352,7 @@ export default function DealForm({ deal, onSubmit, onCancel, dealTypeCategories,
       const blob = await response.blob();
       const file = new File([blob], 'qr-code.png', { type: 'image/png' });
       
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await UploadFile({ file });
 
       setFormData({ ...formData, qr_code_url: file_url });
       alert('QR Code generated successfully!');

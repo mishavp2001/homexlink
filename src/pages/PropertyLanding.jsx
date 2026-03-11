@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { base44, getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -124,7 +124,7 @@ export default function PropertyLanding() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const user = await base44.auth.me();
+        const user = await getCurrentUserProfile();
         setCurrentUser(user);
         // Pre-fill renter name if user is logged in
         setBookingData(prev => ({
@@ -433,7 +433,7 @@ This is an automated message from HomeXREI.
 
     if (!currentUser) {
       alert('Please sign in to make a booking');
-      base44.auth.redirectToAppLogin(window.location.href);
+      void redirectToAppLogin(window.location.href);
       return;
     }
 
@@ -607,7 +607,7 @@ This is an automated message from HomeXREI.
   const handleServiceDealBooking = async (service) => {
     if (!currentUser) {
       alert('Please sign in to book this service');
-      base44.auth.redirectToAppLogin(window.location.href);
+      void redirectToAppLogin(window.location.href);
       return;
     }
 
@@ -916,7 +916,7 @@ Format the output as HTML paragraphs (e.g., <p>...</p><p>...</p>) to ensure prop
   const handleOfferSubmit = (offerData) => {
     if (!currentUser) {
       alert('Please sign in to make an offer');
-      base44.auth.redirectToAppLogin(window.location.href);
+      void redirectToAppLogin(window.location.href);
       return;
     }
 
@@ -992,7 +992,7 @@ Format the output as HTML paragraphs (e.g., <p>...</p><p>...</p>) to ensure prop
   const handleSave = async () => {
     if (!currentUser) {
       alert('Please sign in to save deals');
-      base44.auth.redirectToAppLogin(window.location.href);
+      void redirectToAppLogin(window.location.href);
       return;
     }
 
@@ -1823,7 +1823,7 @@ Format the output as HTML paragraphs (e.g., <p>...</p><p>...</p>) to ensure prop
                       onClick={() => {
                         if (!currentUser) {
                           alert('Please sign in to make an offer');
-                          base44.auth.redirectToAppLogin(window.location.href);
+                          void redirectToAppLogin(window.location.href);
                           return;
                         }
                         setShowOfferForm(true);

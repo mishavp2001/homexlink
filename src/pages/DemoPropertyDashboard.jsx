@@ -8,7 +8,7 @@ import { Home, Wrench, DollarSign, FileText, TrendingUp, AlertTriangle, Calendar
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import Navigation from '../components/Navigation';
-import { base44 } from '@/api/base44Client';
+import { redirectToAppLogin } from '@/api/base44Client';
 
 export const isPublic = true;
 
@@ -17,7 +17,7 @@ export default function DemoPropertyDashboard() {
 
   const handleGetStarted = () => {
     const signupUrl = window.location.origin + createPageUrl('Dashboard') + '?signup=true';
-    base44.auth.redirectToAppLogin(signupUrl);
+    void redirectToAppLogin(signupUrl);
   };
 
   // Demo Property Data

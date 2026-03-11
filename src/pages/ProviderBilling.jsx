@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
+import { LeadCharge, ProviderSettings, ServiceListing } from '@/api/entities';
+import { createCheckoutSession } from '@/api/functions';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -22,11 +24,11 @@ export default function ProviderBilling() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await getCurrentUserProfile();
         setUser(currentUser);
       } catch (error) {
         console.error('Not authenticated', error);
-        base44.auth.redirectToAppLogin(window.location.origin + createPageUrl('ProviderBilling'));
+        void redirectToAppLogin(window.location.origin + createPageUrl('ProviderBilling'));
       }
       setLoadingAuth(false);
     };
@@ -37,7 +39,7 @@ export default function ProviderBilling() {
     queryKey: ['providerSettings', user?.email],
     queryFn: async () => {
       if (!user) return null;
-      const settings = await base44.entities.ProviderSettings.filter({ provider_email: user.email });
+      const settings = await ProviderSettings.filter({ provider_email: user.email });
       return settings[0] || null;
     },
     enabled: !!user
@@ -47,7 +49,7 @@ export default function ProviderBilling() {
     queryKey: ['leadCharges', user?.email],
     queryFn: async () => {
       if (!user) return [];
-      return await base44.entities.LeadCharge.filter({ provider_email: user.email }, '-created_date');
+      return await LeadCharge.filter({ provider_email: user.email }, '-created_date');
     },
     enabled: !!user
   });
@@ -56,7 +58,7 @@ export default function ProviderBilling() {
     queryKey: ['myServices', user?.email],
     queryFn: async () => {
       if (!user) return [];
-      return await base44.entities.ServiceListing.filter({ expert_email: user.email });
+      return await ServiceListing.filter({ expert_email: user.email });
     },
     enabled: !!user
   });
@@ -68,7 +70,7 @@ export default function ProviderBilling() {
         return sum + (charge?.lead_amount || 0);
       }, 0);
 
-      const response = await base44.functions.invoke('createCheckoutSession', {
+      const response = await createCheckoutSession({
         amount: Math.round(totalAmount * 100), // Convert to cents
         invoiceIds: chargeIds
       });

@@ -6,7 +6,9 @@ import { Home, Wrench, MapPin, Phone, Mail, Bed, Bath, Maximize, Calendar, Moon,
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
+import { SavedDeal } from '@/api/entities';
+import { getUserByEmail } from '@/api/functions';
 
 export default function DealCard({ deal, onViewDetails, onMakeOffer, isOwner }) {
   const queryClient = useQueryClient();
@@ -17,7 +19,7 @@ export default function DealCard({ deal, onViewDetails, onMakeOffer, isOwner }) 
   React.useEffect(() => {
     const loadUser = async () => {
       try {
-        const user = await base44.auth.me();
+        const user = await getCurrentUserProfile();
         setCurrentUser(user);
       } catch (error) {
         // User not logged in
@@ -33,7 +35,7 @@ export default function DealCard({ deal, onViewDetails, onMakeOffer, isOwner }) 
         return;
       }
       try {
-        const response = await base44.functions.invoke('getUserByEmail', { email: deal.user_email });
+        const response = await getUserByEmail({ email: deal.user_email });
       } catch (error) {
         // If no ServiceListing found (500), user is a property owner, not a service provider
         // This is expected for property deals - just don't show business info
@@ -50,14 +52,14 @@ export default function DealCard({ deal, onViewDetails, onMakeOffer, isOwner }) 
   // Check if deal is saved by current user
   const { data: savedDeals = [] } = useQuery({
     queryKey: ['savedDeals', currentUser?.email, deal.id],
-    queryFn: () => currentUser ? base44.entities.SavedDeal.filter({ user_email: currentUser.email, deal_id: deal.id }) : [],
+    queryFn: () => currentUser ? SavedDeal.filter({ user_email: currentUser.email, deal_id: deal.id }) : [],
     enabled: !!currentUser
   });
 
   const isSaved = savedDeals.length > 0;
 
   const saveDealMutation = useMutation({
-    mutationFn: (data) => base44.entities.SavedDeal.create(data),
+    mutationFn: data => SavedDeal.create(data),
     onMutate: async (newSave) => {
       // Cancel outgoing refetches
       await queryClient.cancelQueries(['savedDeals', currentUser?.email, deal.id]);
@@ -80,7 +82,7 @@ export default function DealCard({ deal, onViewDetails, onMakeOffer, isOwner }) 
   });
 
   const unsaveDealMutation = useMutation({
-    mutationFn: (id) => base44.entities.SavedDeal.delete(id),
+    mutationFn: id => SavedDeal.delete(id),
     onMutate: async () => {
       // Cancel outgoing refetches
       await queryClient.cancelQueries(['savedDeals', currentUser?.email, deal.id]);
@@ -107,7 +109,7 @@ export default function DealCard({ deal, onViewDetails, onMakeOffer, isOwner }) 
     
     if (!currentUser) {
       alert('Please sign in to save deals');
-      base44.auth.redirectToAppLogin(window.location.href);
+      void redirectToAppLogin(window.location.href);
       return;
     }
 
@@ -132,7 +134,7 @@ export default function DealCard({ deal, onViewDetails, onMakeOffer, isOwner }) 
     
     if (!currentUser) {
       alert('Please sign in to contact seller');
-      base44.auth.redirectToAppLogin(window.location.href);
+      void redirectToAppLogin(window.location.href);
       return;
     }
 
@@ -147,7 +149,7 @@ export default function DealCard({ deal, onViewDetails, onMakeOffer, isOwner }) 
     
     if (!currentUser) {
       alert('Please sign in to make an offer');
-      base44.auth.redirectToAppLogin(window.location.href);
+      void redirectToAppLogin(window.location.href);
       return;
     }
     

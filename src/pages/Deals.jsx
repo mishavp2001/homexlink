@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { base44, getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -107,7 +107,7 @@ export default function Deals() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await getCurrentUserProfile();
         setUser(currentUser);
         setBookingData(prev => ({ ...prev, renter_name: currentUser?.full_name || '' }));
       } catch (error) {
@@ -339,7 +339,7 @@ ${window.location.origin}/dashboard`;
   const handleSubmit = (data) => {
     if (!user) {
       alert('Please sign in to post a deal');
-      base44.auth.redirectToAppLogin(window.location.href);
+      void redirectToAppLogin(window.location.href);
       return;
     }
 
@@ -367,7 +367,7 @@ ${window.location.origin}/dashboard`;
 
     if (!user) {
       alert('Please sign in to book this service');
-      base44.auth.redirectToAppLogin(window.location.href);
+      void redirectToAppLogin(window.location.href);
       return;
     }
 

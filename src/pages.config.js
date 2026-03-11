@@ -50,7 +50,6 @@
 import Accounting from './pages/Accounting';
 import Admin from './pages/Admin';
 import AdminVideoGeneration from './pages/AdminVideoGeneration';
-import AuthCallback from './pages/AuthCallback';
 import ConsentRecords from './pages/ConsentRecords';
 import Dashboard from './pages/Dashboard';
 import Deals from './pages/Deals';
@@ -98,7 +97,6 @@ export const PAGES = {
     "Accounting": Accounting,
     "Admin": Admin,
     "AdminVideoGeneration": AdminVideoGeneration,
-    "AuthCallback": AuthCallback,
     "ConsentRecords": ConsentRecords,
     "Dashboard": Dashboard,
     "Deals": Deals,

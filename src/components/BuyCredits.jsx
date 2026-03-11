@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Loader2, CreditCard, DollarSign, AlertCircle } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
+import { createCheckoutSession } from '@/api/functions';
 
 export default function BuyCredits({ isOpen, onClose }) {
   const [processing, setProcessing] = useState(false);
@@ -25,7 +25,7 @@ export default function BuyCredits({ isOpen, onClose }) {
     try {
       console.log('Creating checkout session for amount:', selectedAmount);
       
-      const response = await base44.functions.invoke('createCheckoutSession', { 
+      const response = await createCheckoutSession({ 
         amount: selectedAmount 
       });
 

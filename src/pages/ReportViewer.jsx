@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile } from '@/api/base44Client';
+import { Property, Report } from '@/api/entities';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -19,7 +20,7 @@ export default function ReportViewer() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await getCurrentUserProfile();
         setUser(currentUser);
       } catch (error) {
         console.error('Not authenticated', error); // Added error logging for debugging
@@ -32,7 +33,7 @@ export default function ReportViewer() {
   const { data: report, isLoading } = useQuery({
     queryKey: ['report', reportId],
     queryFn: async () => {
-      const reports = await base44.entities.Report.filter({ id: reportId });
+      const reports = await Report.filter({ id: reportId });
       return reports[0];
     },
     enabled: !!reportId
@@ -41,7 +42,7 @@ export default function ReportViewer() {
   const { data: property } = useQuery({
     queryKey: ['property', report?.property_id],
     queryFn: async () => {
-      const props = await base44.entities.Property.filter({ id: report.property_id });
+      const props = await Property.filter({ id: report.property_id });
       return props[0];
     },
     enabled: !!report?.property_id

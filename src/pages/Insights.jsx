@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
+import { Category, Insight } from '@/api/entities';
+import { getLocationFromIP, searchYouTubeVideos } from '@/api/functions';
+import { UploadFile } from '@/api/integrations';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
@@ -82,7 +85,7 @@ export default function Insights() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await getCurrentUserProfile();
         setUser(currentUser);
         setInsightForm(prev => ({ ...prev, author_name: currentUser.full_name || 'Anonymous' }));
       } catch (error) {
@@ -126,7 +129,7 @@ export default function Insights() {
       if (locationFilter || locationLoadedFromIP) return;
       
       try {
-        const response = await base44.functions.invoke('getLocationFromIP');
+        const response = await getLocationFromIP();
         if (response.data.success && response.data.city) {
           setLocationFilter(response.data.city);
         }
@@ -141,13 +144,13 @@ export default function Insights() {
 
   const { data: insights, isLoading } = useQuery({
     queryKey: ['insights'],
-    queryFn: () => base44.entities.Insight.filter({ status: 'published' }, '-created_date'),
+    queryFn: () => Insight.filter({ status: 'published' }, '-created_date'),
     initialData: []
   });
 
   const { data: insightCategories, isLoading: loadingCategories } = useQuery({
     queryKey: ['insightCategories'],
-    queryFn: () => base44.entities.Category.filter({ type: 'insight_type', is_active: true }),
+    queryFn: () => Category.filter({ type: 'insight_type', is_active: true }),
     initialData: []
   });
 
@@ -173,11 +176,11 @@ export default function Insights() {
   }, [editInsightId, insights, user]);
 
   const createInsightMutation = useMutation({
-    mutationFn: (data) => {
+    mutationFn: data => {
       if (editingInsightId) {
-        return base44.entities.Insight.update(editingInsightId, data);
+        return Insight.update(editingInsightId, data);
       }
-      return base44.entities.Insight.create(data);
+      return Insight.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['insights']);
@@ -196,7 +199,7 @@ export default function Insights() {
   });
 
   const likeInsightMutation = useMutation({
-    mutationFn: ({ id, likes }) => base44.entities.Insight.update(id, { likes: likes + 1 }),
+    mutationFn: ({ id, likes }) => Insight.update(id, { likes: likes + 1 }),
     onSuccess: () => {
       queryClient.invalidateQueries(['insights']);
       setViewingInsight(prev => prev ? { ...prev, likes: prev.likes + 1 } : null);
@@ -204,7 +207,7 @@ export default function Insights() {
   });
 
   const viewInsightMutation = useMutation({
-    mutationFn: ({ id, views }) => base44.entities.Insight.update(id, { views: views + 1 })
+    mutationFn: ({ id, views }) => Insight.update(id, { views: views + 1 })
   });
 
   const handlePhotoUpload = async (e) => {
@@ -213,9 +216,7 @@ export default function Insights() {
     
     setUploadingPhotos(true);
     try {
-      const uploadPromises = files.map(file => 
-        base44.integrations.Core.UploadFile({ file })
-      );
+      const uploadPromises = files.map(file => UploadFile({ file }));
       const results = await Promise.all(uploadPromises);
       const urls = results.map(r => r.file_url);
       setInsightForm({ ...insightForm, photo_urls: [...insightForm.photo_urls, ...urls] });
@@ -236,7 +237,7 @@ export default function Insights() {
     e.preventDefault();
     if (!user) {
       alert('Please sign in to share insights');
-      base44.auth.redirectToAppLogin(window.location.origin + createPageUrl('Insights'));
+      void redirectToAppLogin(window.location.origin + createPageUrl('Insights'));
       return;
     }
 
@@ -294,7 +295,7 @@ export default function Insights() {
       
       setLoadingYouTube(true);
       try {
-        const response = await base44.functions.invoke('searchYouTubeVideos', {
+        const response = await searchYouTubeVideos({
           query: searchQuery,
           maxResults: 6
         });

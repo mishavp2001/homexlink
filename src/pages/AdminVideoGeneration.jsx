@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
+import { Deal } from '@/api/entities';
+import { generatePropertyVideo } from '@/api/functions';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -19,7 +21,7 @@ export default function AdminVideoGeneration() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await getCurrentUserProfile();
         if (currentUser.role !== 'admin') {
           alert('Admin access required');
           window.location.href = '/';
@@ -28,7 +30,7 @@ export default function AdminVideoGeneration() {
         setUser(currentUser);
       } catch (error) {
         alert('Please sign in as admin');
-        base44.auth.redirectToAppLogin(window.location.href);
+        void redirectToAppLogin(window.location.href);
       }
       setLoadingAuth(false);
     };
@@ -37,7 +39,7 @@ export default function AdminVideoGeneration() {
 
   const { data: deals, isLoading: loadingDeals } = useQuery({
     queryKey: ['allDeals'],
-    queryFn: () => base44.entities.Deal.list('-created_date'),
+    queryFn: () => Deal.list('-created_date'),
     enabled: !!user,
     initialData: []
   });
@@ -81,7 +83,7 @@ export default function AdminVideoGeneration() {
     for (const dealId of selectedDeals) {
       const deal = deals.find(d => d.id === dealId);
       try {
-        const response = await base44.functions.invoke('generatePropertyVideo', { dealId });
+        const response = await generatePropertyVideo({ dealId });
         
         if (response.data?.success) {
           allResults.push({

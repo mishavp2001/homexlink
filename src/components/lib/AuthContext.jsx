@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile, logoutCurrentUser } from '@/api/base44Client';
 import { buildLoginUrl } from '@/lib/login-route';
 import { restorePostLoginRedirect } from '@/utils/mobileAuth';
 
@@ -33,7 +33,7 @@ export const AuthProvider = ({ children }) => {
     try {
       // Now check if the user is authenticated
       setIsLoadingAuth(true);
-      const currentUser = await base44.auth.me();
+      const currentUser = await getCurrentUserProfile();
       setUser(currentUser);
       setIsAuthenticated(true);
       setAuthError(null);
@@ -61,10 +61,10 @@ export const AuthProvider = ({ children }) => {
     
     if (shouldRedirect) {
       // Use the SDK's logout method which handles token cleanup and redirect
-      base44.auth.logout(window.location.href);
+      void logoutCurrentUser(window.location.href);
     } else {
       // Just remove the token without redirect
-      base44.auth.logout();
+      void logoutCurrentUser();
     }
   };
 

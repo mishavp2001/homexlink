@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile } from '@/api/base44Client';
+import { Category, Message, ServiceListing } from '@/api/entities';
+import { getLocationFromIP, getServiceProviders, searchGooglePlaces as searchGooglePlacesFunction, sendSMSVerification, verifySMSCode } from '@/api/functions';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -85,7 +87,7 @@ export default function Services() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await getCurrentUserProfile();
         setUser(currentUser);
       } catch (error) {
         // User not logged in
@@ -128,7 +130,7 @@ export default function Services() {
       if (locationFilter || locationLoadedFromIP || cityParam) return;
       
       try {
-        const response = await base44.functions.invoke('getLocationFromIP');
+        const response = await getLocationFromIP();
         if (response.data.success && response.data.city) {
           setLocationFilter(response.data.city);
         }
@@ -143,7 +145,7 @@ export default function Services() {
 
   // Auto-search Google Places when search term or filters change
   useEffect(() => {
-    const searchGooglePlaces = async () => {
+    const loadGooglePlaces = async () => {
       const defaultLocation = 'Granite Bay, CA';
       const searchLocation = locationFilter || defaultLocation;
       
@@ -157,7 +159,7 @@ export default function Services() {
         const categoryQuery = selectedCategory !== 'all' ? selectedCategory : 'service';
         const searchQuery = searchTerm ? `${searchTerm} ${categoryQuery}` : categoryQuery;
         
-        const response = await base44.functions.invoke('searchGooglePlaces', {
+        const response = await searchGooglePlacesFunction({
           query: `${searchQuery} in ${searchLocation}`,
           location: searchLocation
         });
@@ -170,7 +172,7 @@ export default function Services() {
     };
 
     const debounce = setTimeout(() => {
-      searchGooglePlaces();
+      loadGooglePlaces();
     }, 500);
 
     return () => clearTimeout(debounce);
@@ -179,7 +181,7 @@ export default function Services() {
   const { data: serviceProviders, isLoading: loadingServices } = useQuery({
     queryKey: ['serviceProviders'],
     queryFn: async () => {
-      const response = await base44.functions.invoke('getServiceProviders');
+      const response = await getServiceProviders();
       return response.data;
     },
     initialData: [],
@@ -187,13 +189,13 @@ export default function Services() {
 
   const { data: serviceListings } = useQuery({
     queryKey: ['serviceListings'],
-    queryFn: () => base44.entities.ServiceListing.list(),
+    queryFn: () => ServiceListing.list(),
     initialData: [],
   });
 
   const { data: categories } = useQuery({
     queryKey: ['serviceCategories'],
-    queryFn: () => base44.entities.Category.filter({ type: 'service_type', is_active: true }),
+    queryFn: () => Category.filter({ type: 'service_type', is_active: true }),
     initialData: []
   });
 
@@ -252,9 +254,7 @@ export default function Services() {
 
     setSendingSMS(true);
     try {
-      await base44.functions.invoke('sendSMSVerification', {
-        phoneNumber: claimingBusiness.phone
-      });
+      await sendSMSVerification(claimingBusiness.phone);
       alert('Verification code sent to ' + claimingBusiness.phone);
     } catch (error) {
       console.error('Error sending SMS:', error);
@@ -271,7 +271,7 @@ export default function Services() {
 
     setVerifyingCode(true);
     try {
-      const response = await base44.functions.invoke('verifySMSCode', {
+      const response = await verifySMSCode({
         code: verificationCode,
         placeId: claimingBusiness.place_id,
         businessData: {
@@ -329,7 +329,7 @@ export default function Services() {
 
     setSendingMessage(true);
     try {
-      await base44.entities.Message.create({
+      await Message.create({
         sender_email: user.email,
         sender_name: user.full_name || user.email,
         recipient_email: contactingProvider.email,

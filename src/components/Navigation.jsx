@@ -3,7 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { base44 } from '@/api/base44Client';
+import { logoutCurrentUser } from '@/api/base44Client';
+import { Category, Message, ServiceListing } from '@/api/entities';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/components/lib/AuthContext';
 import {
@@ -154,7 +155,7 @@ export default function Navigation({ user, actionButton, locationFilter, onLocat
     queryKey: ['unreadMessages', user?.email],
     queryFn: async () => {
       if (!user) return 0;
-      const messages = await base44.entities.Message.list();
+      const messages = await Message.list();
       const received = messages.filter(m => 
         m.recipient_email === user.email && !m.is_read
       );
@@ -169,7 +170,7 @@ export default function Navigation({ user, actionButton, locationFilter, onLocat
     queryKey: ['isProvider', user?.email],
     queryFn: async () => {
       if (!user) return false;
-      const services = await base44.entities.ServiceListing.filter({ expert_email: user.email });
+      const services = await ServiceListing.filter({ expert_email: user.email });
       return services.length > 0;
     },
     enabled: !!user
@@ -178,7 +179,7 @@ export default function Navigation({ user, actionButton, locationFilter, onLocat
   // Fetch categories for navigation menus
   const { data: categories = [] } = useQuery({
     queryKey: ['navCategories'],
-    queryFn: () => base44.entities.Category.list('name', 100),
+    queryFn: () => Category.list('name', 100),
     staleTime: 60000
   });
 
@@ -187,7 +188,7 @@ export default function Navigation({ user, actionButton, locationFilter, onLocat
   const insightCategories = categories.filter(c => c.type === 'insight_type').sort((a, b) => a.name.localeCompare(b.name));
 
   const handleLogout = () => {
-    base44.auth.logout(window.location.origin + createPageUrl('Landing'));
+    void logoutCurrentUser(window.location.origin + createPageUrl('Landing'));
   };
 
   const handleLogin = () => {

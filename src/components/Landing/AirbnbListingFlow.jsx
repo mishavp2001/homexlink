@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { redirectToAppLogin } from '@/api/base44Client';
+import { PendingUser } from '@/api/entities';
+import { UploadFile } from '@/api/integrations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -66,7 +68,7 @@ export default function AirbnbListingFlow() {
     const files = Array.from(e.target.files).slice(0, 8 - data.photo_urls.length);
     if (!files.length) return;
     setUploadingPhotos(true);
-    const results = await Promise.all(files.map(f => base44.integrations.Core.UploadFile({ file: f })));
+    const results = await Promise.all(files.map(f => UploadFile({ file: f })));
     update('photo_urls', [...data.photo_urls, ...results.map(r => r.file_url)].slice(0, 8));
     setUploadingPhotos(false);
     e.target.value = '';
@@ -75,7 +77,7 @@ export default function AirbnbListingFlow() {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      await base44.entities.PendingUser.create({
+      await PendingUser.create({
         email: data.contact_email || 'pending@homexlink.com',
         user_type: 'homeowner',
         selected_home: {
@@ -103,7 +105,9 @@ export default function AirbnbListingFlow() {
         <h3 className="text-white text-xl font-bold">Listing Ready!</h3>
         <p className="text-white/80 text-sm">Create your free account to publish and manage your short-term rental.</p>
         <Button
-          onClick={() => base44.auth.redirectToAppLogin(window.location.origin + createPageUrl('Dashboard') + '?signup=true')}
+          onClick={() => {
+            void redirectToAppLogin(window.location.origin + createPageUrl('Dashboard') + '?signup=true');
+          }}
           className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 h-11"
         >
           Create Free Account

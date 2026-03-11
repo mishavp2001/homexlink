@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { InvokeLLM } from '@/api/integrations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sparkles, Send, Loader2, ArrowRight, TrendingUp, Plus, Lightbulb } from 'lucide-react';
@@ -35,7 +35,7 @@ export default function AskAITab() {
     setLoading(true);
 
     try {
-      const response = await base44.integrations.Core.InvokeLLM({
+      const response = await InvokeLLM({
         prompt: `You are a friendly AI assistant for HomeXLink, a home management platform.
         
 Platform features:

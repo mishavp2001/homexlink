@@ -2,7 +2,8 @@ export const isPublic = true;
 
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile } from '@/api/base44Client';
+import { Deal } from '@/api/entities';
 import { useQuery } from '@tanstack/react-query';
 import DealDetailsModal from '../components/Deals/DealDetailsModal';
 import CategoryPage from '../components/CategoryPage';
@@ -16,7 +17,7 @@ export default function AirbnbPage() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const user = await base44.auth.me();
+        const user = await getCurrentUserProfile();
         setCurrentUser(user);
       } catch (error) {
         // User not logged in
@@ -28,7 +29,7 @@ export default function AirbnbPage() {
   const { data: deal, isLoading } = useQuery({
     queryKey: ['deal-by-address', address],
     queryFn: async () => {
-      const deals = await base44.entities.Deal.filter({ 
+      const deals = await Deal.filter({ 
         location: address,
         deal_type: 'short_term_rent'
       });

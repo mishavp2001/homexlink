@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { base44, getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -49,7 +49,7 @@ export default function ServiceProfile() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const user = await base44.auth.me();
+        const user = await getCurrentUserProfile();
         setCurrentUser(user);
         setBookingData(prev => ({
           ...prev,
@@ -166,7 +166,7 @@ export default function ServiceProfile() {
 
     if (!currentUser) {
       alert('Please sign in to book this service');
-      base44.auth.redirectToAppLogin(window.location.href);
+      void redirectToAppLogin(window.location.href);
       return;
     }
 
@@ -329,7 +329,7 @@ export default function ServiceProfile() {
   const handleSubmitReview = (reviewData) => {
     if (!currentUser) {
       alert('Please sign in to leave a review');
-      base44.auth.redirectToAppLogin(window.location.href);
+      void redirectToAppLogin(window.location.href);
       return;
     }
 

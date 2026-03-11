@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { redirectToAppLogin } from '@/api/base44Client';
+import { Property } from '@/api/entities';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, LogIn } from 'lucide-react';
@@ -32,7 +33,7 @@ export default function PropertyCapture() {
           const decodedAddress = decodeURIComponent(address);
 
           // Check if property with this address already exists
-          const properties = await base44.entities.Property.filter({ address: decodedAddress });
+          const properties = await Property.filter({ address: decodedAddress });
 
           if (properties && properties.length > 0) {
             // Property exists - show login prompt
@@ -66,7 +67,7 @@ export default function PropertyCapture() {
 
   const handleLogin = () => {
     const dashboardUrl = window.location.origin + createPageUrl('Dashboard');
-    base44.auth.redirectToAppLogin(dashboardUrl);
+    void redirectToAppLogin(dashboardUrl);
   };
 
   if (checking) {

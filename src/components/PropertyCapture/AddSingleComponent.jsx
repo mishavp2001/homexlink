@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { base44 } from '@/api/base44Client';
+import { UploadFile } from '@/api/integrations';
 import { Upload, X, Camera, Loader2 } from 'lucide-react';
 
 const componentTypes = [
@@ -43,7 +43,7 @@ export default function AddSingleComponent({ onSave, onCancel, initialData = nul
     const uploadedUrls = [];
     try {
       for (const file of files) {
-        const { file_url } = await base44.integrations.Core.UploadFile({ file });
+        const { file_url } = await UploadFile({ file });
         uploadedUrls.push(file_url);
       }
       setFormData(prev => ({

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { base44, getCurrentUserProfile, redirectToAppLogin, updateCurrentUserProfile } from '@/api/base44Client';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -30,7 +30,7 @@ export default function Dashboard() {
 
     const loadUser = async () => {
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await getCurrentUserProfile();
         setUser(currentUser);
         
         // Check for pending user data and auto-convert to Property/MaintenanceTask
@@ -52,7 +52,7 @@ export default function Dashboard() {
             // Process based on user type
             if (pendingUser.user_type === 'service_provider' && pendingUser.service_listing) {
               // Update user type and clear business fields from User.data (they belong in ServiceListing)
-              await base44.auth.updateMe({ 
+              await updateCurrentUserProfile({ 
                 user_type: 'service_provider',
                 business_name: null,
                 business_address: null,
@@ -92,7 +92,7 @@ export default function Dashboard() {
               window.location.reload();
             } else if (pendingUser.user_type === 'homeowner' && pendingUser.project) {
               // Update user type
-              await base44.auth.updateMe({ user_type: 'homeowner' });
+              await updateCurrentUserProfile({ user_type: 'homeowner' });
               
               // Create property
               const property = await base44.entities.Property.create({
@@ -157,7 +157,7 @@ export default function Dashboard() {
       } catch (error) {
         console.error('Not authenticated', error);
         const dashboardUrl = window.location.origin + createPageUrl('Dashboard');
-        base44.auth.redirectToAppLogin(dashboardUrl);
+        void redirectToAppLogin(dashboardUrl);
       }
       setLoadingAuth(false);
     };

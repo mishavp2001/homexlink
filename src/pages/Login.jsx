@@ -85,7 +85,6 @@ export default function Login() {
           <Authenticator
             key={`${initialState}:${redirectTarget}`}
             initialState={initialState}
-            socialProviders={['facebook', 'google']}
             loginMechanisms={['email']}
             signUpAttributes={['email']}
           >

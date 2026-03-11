@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin, updateCurrentUserProfile } from '@/api/base44Client';
+import { Category, ServiceListing } from '@/api/entities';
+import { UploadFile } from '@/api/integrations';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
@@ -94,7 +96,7 @@ export default function Profile() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await getCurrentUserProfile();
         setUser(currentUser);
         
         // Show SMS opt-in modal for first-time users
@@ -129,7 +131,7 @@ export default function Profile() {
         
         // For service providers, load data from ServiceListing
         if (currentUser.user_type === 'service_provider') {
-          const listings = await base44.entities.ServiceListing.filter({ expert_email: currentUser.email });
+          const listings = await ServiceListing.filter({ expert_email: currentUser.email });
           if (listings.length > 0) {
             const listing = listings[0];
             initialProfileData = {
@@ -172,7 +174,7 @@ export default function Profile() {
       } catch (error) {
         console.error('Not authenticated');
         const profileUrl = window.location.origin + createPageUrl('Profile');
-        base44.auth.redirectToAppLogin(profileUrl);
+        void redirectToAppLogin(profileUrl);
       }
       setLoadingAuth(false);
     };
@@ -181,21 +183,21 @@ export default function Profile() {
 
   const { data: myServices, isLoading } = useQuery({
     queryKey: ['myServices', user?.email],
-    queryFn: () => user ? base44.entities.ServiceListing.filter({ expert_email: user.email }, '-created_date') : [],
+    queryFn: () => user ? ServiceListing.filter({ expert_email: user.email }, '-created_date') : [],
     enabled: !!user,
     initialData: []
   });
 
   const { data: categories } = useQuery({
     queryKey: ['serviceCategories'],
-    queryFn: () => base44.entities.Category.filter({ type: 'service_type', is_active: true }),
+    queryFn: () => Category.filter({ type: 'service_type', is_active: true }),
     initialData: []
   });
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data) => {
       // Save basic user info to User entity
-      await base44.auth.updateMe({
+      await updateCurrentUserProfile({
         user_type: data.user_type,
         bio: data.bio,
         profile_photo_url: data.profile_photo_url
@@ -203,7 +205,7 @@ export default function Profile() {
       
       // For service providers, save business data to ServiceListing
       if (data.user_type === 'service_provider') {
-        const existingListings = await base44.entities.ServiceListing.filter({ expert_email: user.email });
+        const existingListings = await ServiceListing.filter({ expert_email: user.email });
         
         const serviceListingData = {
           expert_email: user.email,
@@ -226,9 +228,9 @@ export default function Profile() {
         };
         
         if (existingListings.length === 0) {
-          await base44.entities.ServiceListing.create(serviceListingData);
+          await ServiceListing.create(serviceListingData);
         } else {
-          await base44.entities.ServiceListing.update(existingListings[0].id, serviceListingData);
+          await ServiceListing.update(existingListings[0].id, serviceListingData);
         }
       }
     },
@@ -243,7 +245,7 @@ export default function Profile() {
   });
 
   const createServiceMutation = useMutation({
-    mutationFn: (data) => base44.entities.ServiceListing.create(data),
+    mutationFn: data => ServiceListing.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries(['myServices']);
       setShowServiceForm(false);
@@ -267,7 +269,7 @@ export default function Profile() {
   });
 
   const updateServiceMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.ServiceListing.update(id, data),
+    mutationFn: ({ id, data }) => ServiceListing.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['myServices']);
       setEditingService(null);
@@ -280,7 +282,7 @@ export default function Profile() {
   });
 
   const deleteServiceMutation = useMutation({
-    mutationFn: (id) => base44.entities.ServiceListing.delete(id),
+    mutationFn: id => ServiceListing.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['myServices']);
     },
@@ -296,7 +298,7 @@ export default function Profile() {
     
     setUploadingProfilePhoto(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await UploadFile({ file });
       setProfileForm({ ...profileForm, profile_photo_url: file_url });
     } catch (error) {
       console.error('Upload error:', error);
@@ -311,7 +313,7 @@ export default function Profile() {
     
     setUploadingBusinessPhoto(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await UploadFile({ file });
       setProfileForm({ ...profileForm, business_photo_url: file_url });
     } catch (error) {
       console.error('Upload error:', error);
@@ -326,7 +328,7 @@ export default function Profile() {
     
     setUploadingWorkPhoto(true);
     try {
-      const uploadPromises = files.map(file => base44.integrations.Core.UploadFile({ file }));
+      const uploadPromises = files.map(file => UploadFile({ file }));
       const results = await Promise.all(uploadPromises);
       const newUrls = results.map(r => r.file_url);
       setProfileForm({ ...profileForm, work_photos: [...profileForm.work_photos, ...newUrls] });
@@ -343,7 +345,7 @@ export default function Profile() {
     
     setUploadingPhoto(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await UploadFile({ file });
       setServiceForm({ ...serviceForm, photo_url: file_url });
     } catch (error) {
       console.error('Upload error:', error);
@@ -629,8 +631,14 @@ export default function Profile() {
                             setShowSMSOptIn(true);
                           } else {
                             if (confirm('Are you sure you want to opt-out of SMS notifications?')) {
-                              base44.auth.updateMe({ sms_consent: false, sms_opt_in: false });
-                              window.location.reload();
+                              void updateCurrentUserProfile({ sms_consent: false, sms_opt_in: false })
+                                .then(() => {
+                                  window.location.reload();
+                                })
+                                .catch(error => {
+                                  console.error('Error updating SMS preferences:', error);
+                                  alert('Failed to update SMS preferences. Please try again.');
+                                });
                             }
                           }
                         }}

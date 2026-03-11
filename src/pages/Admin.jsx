@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile } from '@/api/base44Client';
+import { Category, Insight, ServiceListing } from '@/api/entities';
+import { runAutomation as runAutomationJob } from '@/api/functions';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -38,7 +40,7 @@ export default function Admin() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await getCurrentUserProfile();
         setUser(currentUser);
       } catch (error) {
         console.error('Not authenticated');
@@ -50,24 +52,24 @@ export default function Admin() {
 
   const { data: categories, isLoading: loadingCategories } = useQuery({
     queryKey: ['categories'],
-    queryFn: () => base44.entities.Category.list('-created_date'),
+    queryFn: () => Category.list('-created_date'),
     initialData: []
   });
 
   const { data: services } = useQuery({
     queryKey: ['services'],
-    queryFn: () => base44.entities.ServiceListing.list('-created_date'),
+    queryFn: () => ServiceListing.list('-created_date'),
     initialData: []
   });
 
   const { data: insights } = useQuery({
     queryKey: ['insights'],
-    queryFn: () => base44.entities.Insight.list('-created_date'),
+    queryFn: () => Insight.list('-created_date'),
     initialData: []
   });
 
   const createCategoryMutation = useMutation({
-    mutationFn: (data) => base44.entities.Category.create(data),
+    mutationFn: data => Category.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries(['categories']);
       setShowCategoryForm(false);
@@ -76,7 +78,7 @@ export default function Admin() {
   });
 
   const updateCategoryMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Category.update(id, data),
+    mutationFn: ({ id, data }) => Category.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['categories']);
       setEditingCategory(null);
@@ -85,21 +87,21 @@ export default function Admin() {
   });
 
   const deleteCategoryMutation = useMutation({
-    mutationFn: (id) => base44.entities.Category.delete(id),
+    mutationFn: id => Category.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['categories']);
     }
   });
 
   const updateServiceMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.ServiceListing.update(id, data),
+    mutationFn: ({ id, data }) => ServiceListing.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['services']);
     }
   });
 
   const updateInsightMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Insight.update(id, data),
+    mutationFn: ({ id, data }) => Insight.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['insights']);
     }
@@ -125,7 +127,7 @@ export default function Admin() {
     setAutomationLogs(['Starting automation...']);
     
     try {
-      const response = await base44.functions.invoke('runAutomation', {});
+      const response = await runAutomationJob();
       
       if (response.data.success) {
         setAutomationLogs(response.data.logs);

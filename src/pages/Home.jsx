@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import Landing from './Landing';
 import { Loader2 } from 'lucide-react';
@@ -15,7 +15,7 @@ export default function Home() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await getCurrentUserProfile();
         if (currentUser) {
           // User is logged in, redirect to dashboard
           setIsAuthenticated(true);

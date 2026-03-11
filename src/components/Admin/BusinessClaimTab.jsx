@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { searchGooglePlaces, sendClaimSMS } from '@/api/functions';
 import { Search, MapPin, Loader2, Send, CheckCircle } from 'lucide-react';
 
 export default function BusinessClaimTab() {
@@ -27,7 +27,7 @@ export default function BusinessClaimTab() {
       setLoadingPlaces(true);
       try {
         const searchQuery = searchTerm ? `${searchTerm} service` : 'service';
-        const response = await base44.functions.invoke('searchGooglePlaces', {
+        const response = await searchGooglePlaces({
           query: `${searchQuery} in ${locationFilter}`,
           location: locationFilter
         });
@@ -60,7 +60,7 @@ export default function BusinessClaimTab() {
       const city = selectedBusiness.address?.split(',')[1]?.trim() || locationFilter;
       const claimUrl = `${window.location.origin}/services?claim=${businessSlug}&city=${encodeURIComponent(city)}`;
 
-      await base44.functions.invoke('sendClaimSMS', {
+      await sendClaimSMS({
         phoneNumber: selectedBusiness.phone,
         businessName: selectedBusiness.name,
         claimUrl: claimUrl

@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Loader2, Sparkles, Send, X, Camera } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
+import { PropertyComponent } from '@/api/entities';
+import { InvokeLLM, UploadFile } from '@/api/integrations';
 
 export default function ComponentCard({ component, onUpdate, onRequestQuote, canEdit, propertyId }) {
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -21,7 +22,7 @@ export default function ComponentCard({ component, onUpdate, onRequestQuote, can
   const handleSave = async () => {
     setSaving(true);
     try {
-      await base44.entities.PropertyComponent.update(component.id, editData);
+      await PropertyComponent.update(component.id, editData);
       onUpdate();
       setShowEditDialog(false);
     } catch (error) {
@@ -57,7 +58,7 @@ Provide comprehensive insights including:
 
 Format as structured JSON.`;
 
-      const aiInsights = await base44.integrations.Core.InvokeLLM({
+      const aiInsights = await InvokeLLM({
         prompt,
         response_json_schema: {
           type: "object",
@@ -72,7 +73,7 @@ Format as structured JSON.`;
         }
       });
 
-      await base44.entities.PropertyComponent.update(component.id, {
+      await PropertyComponent.update(component.id, {
         ai_insights: aiInsights,
         ai_insights_generated_date: new Date().toISOString()
       });
@@ -94,7 +95,7 @@ Format as structured JSON.`;
     setUploadingPhotos(true);
     try {
       const uploadPromises = files.map(file =>
-        base44.integrations.Core.UploadFile({ file })
+        UploadFile({ file })
       );
       const results = await Promise.all(uploadPromises);
       const urls = results.map(r => r.file_url);

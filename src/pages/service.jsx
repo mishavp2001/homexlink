@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile } from '@/api/base44Client';
+import { Deal, Review, ServiceListing } from '@/api/entities';
+import { getUserByBusinessName } from '@/api/functions';
 import { useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -24,7 +26,7 @@ export default function ServiceProfile() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const user = await base44.auth.me();
+        const user = await getCurrentUserProfile();
         setCurrentUser(user);
       } catch (error) {
         setCurrentUser(null);
@@ -42,7 +44,7 @@ export default function ServiceProfile() {
       }
 
       try {
-        const response = await base44.functions.invoke('getUserByBusinessName', {
+        const response = await getUserByBusinessName({
           businessName: businessName
         });
 
@@ -65,7 +67,7 @@ export default function ServiceProfile() {
     queryKey: ['userServices', userEmail],
     queryFn: async () => {
       if (!userEmail) return [];
-      return await base44.entities.ServiceListing.filter({ 
+      return await ServiceListing.filter({ 
         expert_email: userEmail, 
         status: 'active' 
       });
@@ -94,7 +96,7 @@ export default function ServiceProfile() {
     queryKey: ['userDeals', userEmail],
     queryFn: async () => {
       if (!userEmail) return [];
-      return await base44.entities.Deal.filter({ 
+      return await Deal.filter({ 
         user_email: userEmail, 
         status: 'active' 
       });
@@ -108,7 +110,7 @@ export default function ServiceProfile() {
     queryFn: async () => {
       if (!userServices || userServices.length === 0) return [];
       const serviceIds = userServices.map(s => s.id);
-      const reviews = await base44.entities.Review.list();
+      const reviews = await Review.list();
       return reviews.filter(r => serviceIds.includes(r.service_listing_id));
     },
     enabled: userServices.length > 0,

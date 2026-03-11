@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
-import { base44 } from '@/api/base44Client';
+import { UploadFile } from '@/api/integrations';
 import { Upload, X, Camera, Loader2 } from 'lucide-react';
 
 const componentTypes = [
@@ -27,7 +27,7 @@ export default function ComponentUploader({ onNext, onBack }) {
 
     try {
       for (const file of files) {
-        const { file_url } = await base44.integrations.Core.UploadFile({ file });
+        const { file_url } = await UploadFile({ file });
         uploadedUrls.push(file_url);
       }
 

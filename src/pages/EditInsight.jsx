@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
+import { Category, Insight } from '@/api/entities';
+import { UploadFile } from '@/api/integrations';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import ReactQuill from 'react-quill';
@@ -50,15 +52,15 @@ export default function EditInsight() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await getCurrentUserProfile();
         setUser(currentUser);
         if (!currentUser) {
-           base44.auth.redirectToAppLogin(window.location.href);
+           void redirectToAppLogin(window.location.href);
         } else if (!insightId) {
            setInsightForm(prev => ({ ...prev, author_name: currentUser.full_name || 'Anonymous' }));
         }
       } catch (error) {
-        base44.auth.redirectToAppLogin(window.location.href);
+        void redirectToAppLogin(window.location.href);
       }
     };
     loadUser();
@@ -68,7 +70,7 @@ export default function EditInsight() {
     queryKey: ['insight', insightId],
     queryFn: async () => {
       if (!insightId) return null;
-      const insights = await base44.entities.Insight.filter({ id: insightId });
+      const insights = await Insight.filter({ id: insightId });
       return insights[0];
     },
     enabled: !!insightId
@@ -76,7 +78,7 @@ export default function EditInsight() {
 
   const { data: categories } = useQuery({
     queryKey: ['insightCategories'],
-    queryFn: () => base44.entities.Category.filter({ type: 'insight_type', is_active: true }),
+    queryFn: () => Category.filter({ type: 'insight_type', is_active: true }),
     initialData: []
   });
 
@@ -94,11 +96,11 @@ export default function EditInsight() {
   }, [insight]);
 
   const mutation = useMutation({
-    mutationFn: (data) => {
+    mutationFn: data => {
       if (insightId) {
-        return base44.entities.Insight.update(insightId, data);
+        return Insight.update(insightId, data);
       }
-      return base44.entities.Insight.create(data);
+      return Insight.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['insights']);
@@ -112,9 +114,7 @@ export default function EditInsight() {
     
     setUploadingPhotos(true);
     try {
-      const uploadPromises = files.map(file => 
-        base44.integrations.Core.UploadFile({ file })
-      );
+      const uploadPromises = files.map(file => UploadFile({ file }));
       const results = await Promise.all(uploadPromises);
       const urls = results.map(r => r.file_url);
       setInsightForm({ ...insightForm, photo_urls: [...insightForm.photo_urls, ...urls] });

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { fetchPropertyData } from '@/api/functions';
+import { InvokeLLM } from '@/api/integrations';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -48,7 +49,7 @@ export default function PropertyInfoForm({ initialData, onNext }) {
 
     try {
       // Step 1: Validate address format and existence
-      const validationResult = await base44.integrations.Core.InvokeLLM({
+      const validationResult = await InvokeLLM({
         prompt: `Validate this address: "${address}". Check if it's a valid, complete US address format (with street, city, state, and ZIP). Return validation result.`,
         response_json_schema: {
           type: 'object',
@@ -78,7 +79,7 @@ export default function PropertyInfoForm({ initialData, onNext }) {
       let enrichResult = null;
       
       try {
-        const databrightResponse = await base44.functions.invoke('fetchPropertyData', {
+        const databrightResponse = await fetchPropertyData({
           address: formattedAddress
         });
         
@@ -105,7 +106,7 @@ export default function PropertyInfoForm({ initialData, onNext }) {
       
       // Fallback to AI enrichment if Databright fails
       if (!enrichResult) {
-        enrichResult = await base44.integrations.Core.InvokeLLM({
+        enrichResult = await InvokeLLM({
           prompt: `You are a real estate data expert. For the property at "${formattedAddress}", retrieve accurate property information from public records, real estate databases, and county assessor data. Provide the most accurate and up-to-date information available.
 
 Include:

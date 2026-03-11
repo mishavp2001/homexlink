@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
+import { MaintenanceTask, Property, PropertyComponent, Report } from '@/api/entities';
+import { InvokeLLM } from '@/api/integrations';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -54,7 +56,7 @@ export default function PropertyDetails() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await getCurrentUserProfile();
         setUser(currentUser);
       } catch (error) {
         // User not logged in - can still view
@@ -67,7 +69,7 @@ export default function PropertyDetails() {
   const { data: property, isLoading, refetch } = useQuery({
     queryKey: ['property', propertyId],
     queryFn: async () => {
-      const props = await base44.entities.Property.filter({ id: propertyId });
+      const props = await Property.filter({ id: propertyId });
       return props[0];
     },
     enabled: !!propertyId
@@ -75,7 +77,7 @@ export default function PropertyDetails() {
 
   const { data: components } = useQuery({
     queryKey: ['components', propertyId],
-    queryFn: () => base44.entities.PropertyComponent.filter({ property_id: propertyId }),
+    queryFn: () => PropertyComponent.filter({ property_id: propertyId }),
     enabled: !!propertyId,
     initialData: []
   });
@@ -90,7 +92,7 @@ export default function PropertyDetails() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await base44.entities.Property.update(propertyId, formData);
+      await Property.update(propertyId, formData);
       await refetch();
       setEditing(false);
     } catch (error) {
@@ -101,7 +103,7 @@ export default function PropertyDetails() {
 
   // This mutation is no longer used in handleRequestQuote, but kept as per original code.
   const createMaintenanceTaskMutation = useMutation({
-    mutationFn: (taskData) => base44.entities.MaintenanceTask.create(taskData),
+    mutationFn: taskData => MaintenanceTask.create(taskData),
     onSuccess: () => {
       queryClient.invalidateQueries(['projects']);
       navigate(createPageUrl(`Maintenance?propertyId=${propertyId}`));
@@ -112,7 +114,7 @@ export default function PropertyDetails() {
     if (!user) {
       alert('Please log in to request a service quote.');
       const propertyDetailsUrl = window.location.origin + window.location.pathname + window.location.search;
-      base44.auth.redirectToAppLogin(propertyDetailsUrl);
+      void redirectToAppLogin(propertyDetailsUrl);
       return;
     }
 
@@ -144,7 +146,7 @@ export default function PropertyDetails() {
     if (!user) {
       alert('Please log in to request a service quote.');
       const propertyDetailsUrl = window.location.origin + window.location.pathname + window.location.search;
-      base44.auth.redirectToAppLogin(propertyDetailsUrl);
+      void redirectToAppLogin(propertyDetailsUrl);
       return;
     }
 
@@ -216,7 +218,7 @@ export default function PropertyDetails() {
   const handleAddComponent = async (componentData) => {
     setSavingComponent(true);
     try {
-      await base44.entities.PropertyComponent.create({
+      await PropertyComponent.create({
         ...componentData,
         property_id: propertyId
       });
@@ -240,7 +242,7 @@ export default function PropertyDetails() {
       let landValue = property.land_value || 100000;
       
       try {
-        const propertyEnrichment = await base44.integrations.Core.InvokeLLM({
+        const propertyEnrichment = await InvokeLLM({
           prompt: `For a ${property.property_type} property at "${property.address}" with ${property.sqft} sqft built in ${property.year_built || 2000}, provide updated realistic current rebuild cost per sqft and estimated land value considering current market conditions.
           
 Additional Context: ${additionalInfo}
@@ -269,7 +271,7 @@ Return only numbers.`,
       setRevaluationProgress('Generating updated AI insights...');
       
       // Generate new AI insights with additional context
-      const aiInsights = await base44.integrations.Core.InvokeLLM({
+      const aiInsights = await InvokeLLM({
         prompt: `As an expert real estate analyst, provide updated comprehensive investment analysis for this property with new information:
         
 Property Details:
@@ -369,7 +371,7 @@ Be realistic, data-driven, and incorporate the additional information provided.`
       setRevaluationProgress('Generating updated appraisal report...');
       
       // Generate new appraisal report
-      const appraisalReportData = await base44.integrations.Core.InvokeLLM({
+      const appraisalReportData = await InvokeLLM({
         prompt: `Generate an UPDATED professional property appraisal report for:
 Address: ${property.address}
 
@@ -424,18 +426,18 @@ Be thorough and professional, highlighting what changed and why.`,
       appraisalReportData.asset_residual_value = totalResidualValue;
 
       // Get existing reports
-      const reports = await base44.entities.Report.filter({ property_id: propertyId });
+      const reports = await Report.filter({ property_id: propertyId });
       const existingAppraisalReport = reports.find(r => r.report_type === 'appraisal');
 
       if (existingAppraisalReport) {
         // Update existing appraisal report
-        await base44.entities.Report.update(existingAppraisalReport.id, {
+        await Report.update(existingAppraisalReport.id, {
           report_data: appraisalReportData,
           summary: `Updated Appraised Value: $${newAppraisedValue.toFixed(2)}`
         });
       } else {
         // Create new appraisal report
-        await base44.entities.Report.create({
+        await Report.create({
           property_id: propertyId,
           report_type: 'appraisal',
           report_data: appraisalReportData,
@@ -446,7 +448,7 @@ Be thorough and professional, highlighting what changed and why.`,
       setRevaluationProgress('Updating property records...');
       
       // Update property with new values
-      await base44.entities.Property.update(propertyId, {
+      await Property.update(propertyId, {
         rebuild_cost_per_sqft: rebuildCostPerSqft,
         land_value: landValue,
         market_rating: newMarketRating[0],

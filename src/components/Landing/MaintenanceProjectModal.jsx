@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { base44 } from '@/api/base44Client';
+import { redirectToAppLogin } from '@/api/base44Client';
+import { Category } from '@/api/entities';
+import { UploadFile } from '@/api/integrations';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -25,7 +26,6 @@ const COMPONENT_TYPES = [
 ];
 
 export default function MaintenanceProjectModal({ onClose }) {
-  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [projectData, setProjectData] = useState({ project_title: '', project_description: '', project_type: '', component_type: '', urgency: 'medium', preferred_timeline: '', budget_range: '', photo_urls: [] });
   const [profileData, setProfileData] = useState({ full_name: '', email: '', phone: '', address: '' });
@@ -34,14 +34,14 @@ export default function MaintenanceProjectModal({ onClose }) {
 
   const { data: projectTypeCategories = [] } = useQuery({
     queryKey: ['projectTypeCategories'],
-    queryFn: () => base44.entities.Category.filter({ type: 'project_type', is_active: true })
+    queryFn: () => Category.filter({ type: 'project_type', is_active: true })
   });
 
   const handlePhotoUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
     setUploadingPhotos(true);
-    const results = await Promise.all(files.map(f => base44.integrations.Core.UploadFile({ file: f })));
+    const results = await Promise.all(files.map(f => UploadFile({ file: f })));
     setProjectData(prev => ({ ...prev, photo_urls: [...prev.photo_urls, ...results.map(r => r.file_url)] }));
     setUploadingPhotos(false);
   };
@@ -55,7 +55,7 @@ export default function MaintenanceProjectModal({ onClose }) {
     if (!profileData.full_name || !profileData.email || !profileData.address) { alert('Please fill in all required fields'); return; }
     setCreating(true);
     const signupUrl = window.location.origin + createPageUrl('Dashboard') + '?signup=true&name=' + encodeURIComponent(profileData.full_name) + '&email=' + encodeURIComponent(profileData.email) + '&phone=' + encodeURIComponent(profileData.phone || '') + '&address=' + encodeURIComponent(profileData.address) + '&project=' + encodeURIComponent(JSON.stringify(projectData));
-    base44.auth.redirectToAppLogin(signupUrl);
+    void redirectToAppLogin(signupUrl);
   };
 
   return (

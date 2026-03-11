@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { InvokeLLM } from '@/api/integrations';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -31,7 +31,7 @@ ${criteria.additional_notes ? `\nAdditional Requirements: ${criteria.additional_
 
 For each home, provide realistic market data including address, price, bedrooms, bathrooms, square footage, and a brief description.`;
 
-      const response = await base44.integrations.Core.InvokeLLM({
+      const response = await InvokeLLM({
         prompt,
         add_context_from_internet: true,
         response_json_schema: {

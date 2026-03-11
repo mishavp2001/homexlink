@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
+import { Category, Deal } from '@/api/entities';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import DealForm from '../components/Deals/DealForm';
@@ -18,13 +19,13 @@ export default function EditDeal() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await getCurrentUserProfile();
         setUser(currentUser);
         if (!currentUser) {
-           base44.auth.redirectToAppLogin(window.location.href);
+           void redirectToAppLogin(window.location.href);
         }
       } catch (error) {
-        base44.auth.redirectToAppLogin(window.location.href);
+        void redirectToAppLogin(window.location.href);
       }
     };
     loadUser();
@@ -34,7 +35,7 @@ export default function EditDeal() {
     queryKey: ['deal', dealId],
     queryFn: async () => {
       if (!dealId) return null;
-      const deals = await base44.entities.Deal.filter({ id: dealId });
+      const deals = await Deal.filter({ id: dealId });
       return deals[0];
     },
     enabled: !!dealId
@@ -42,18 +43,18 @@ export default function EditDeal() {
 
   const { data: dealTypeCategories } = useQuery({
     queryKey: ['dealTypeCategories'],
-    queryFn: () => base44.entities.Category.filter({ type: 'deal_type', is_active: true }),
+    queryFn: () => Category.filter({ type: 'deal_type', is_active: true }),
     initialData: []
   });
 
   const { data: serviceCategories } = useQuery({
     queryKey: ['serviceCategories'],
-    queryFn: () => base44.entities.Category.filter({ type: 'service_type', is_active: true }),
+    queryFn: () => Category.filter({ type: 'service_type', is_active: true }),
     initialData: []
   });
 
   const updateDealMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Deal.update(id, data),
+    mutationFn: ({ id, data }) => Deal.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['deals']);
       navigate(-1); // Go back
@@ -61,7 +62,7 @@ export default function EditDeal() {
   });
 
   const createDealMutation = useMutation({
-    mutationFn: (data) => base44.entities.Deal.create(data),
+    mutationFn: data => Deal.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries(['deals']);
       navigate(createPageUrl('Deals'));

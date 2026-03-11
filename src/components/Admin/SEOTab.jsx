@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { PageMetadata } from '@/api/entities';
+import { generateAllPageMetadata, generatePageMetadata } from '@/api/functions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,14 +19,12 @@ export default function SEOTab() {
 
   const { data: metadata = [], isLoading } = useQuery({
     queryKey: ['pageMetadata'],
-    queryFn: () => base44.entities.PageMetadata.list('-last_generated_date')
+    queryFn: () => PageMetadata.list('-last_generated_date')
   });
 
   const generateSingleMutation = useMutation({
     mutationFn: async (pageName) => {
-      const response = await base44.functions.invoke('generatePageMetadata', { 
-        page_name: pageName 
-      });
+      const response = await generatePageMetadata(pageName);
       return response.data;
     },
     onSuccess: () => {
@@ -39,7 +38,7 @@ export default function SEOTab() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }) => {
-      return await base44.entities.PageMetadata.update(id, {
+      return await PageMetadata.update(id, {
         ...data,
         is_auto_generated: false
       });
@@ -55,7 +54,7 @@ export default function SEOTab() {
   const handleGenerateAll = async () => {
     setGeneratingAll(true);
     try {
-      const response = await base44.functions.invoke('generateAllPageMetadata', {});
+      const response = await generateAllPageMetadata();
       toast.success(response.data.message);
       queryClient.invalidateQueries({ queryKey: ['pageMetadata'] });
     } catch (error) {

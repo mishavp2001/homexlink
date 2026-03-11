@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
+import { Property, PropertyComponent, Report } from '@/api/entities';
+import { InvokeLLM } from '@/api/integrations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,7 +31,7 @@ export default function ReviewAndGenerate({ propertyData, componentData, onBack 
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await getCurrentUserProfile();
         setUser(currentUser);
         setEmail(currentUser.email);
         setFullName(currentUser.full_name || '');
@@ -67,7 +69,7 @@ export default function ReviewAndGenerate({ propertyData, componentData, onBack 
       let landValue = 100000;
       
       try {
-        const propertyEnrichment = await base44.integrations.Core.InvokeLLM({
+        const propertyEnrichment = await InvokeLLM({
           prompt: `For a ${propertyData.property_type} property at "${propertyData.address}" with ${propertyData.sqft} sqft built in ${propertyData.year_built || 2000}, provide realistic current rebuild cost per sqft and estimated land value. Return only numbers.`,
           response_json_schema: {
             type: 'object',
@@ -95,7 +97,7 @@ export default function ReviewAndGenerate({ propertyData, componentData, onBack 
 
       setProgress('Generating AI-powered market insights...');
       
-      const aiInsights = await base44.integrations.Core.InvokeLLM({
+      const aiInsights = await InvokeLLM({
         prompt: `As an expert real estate analyst, provide comprehensive investment analysis for this property:
         
 Property Details:
@@ -177,7 +179,7 @@ Be realistic, data-driven, and specific to the location and property type.`,
         add_context_from_internet: true
       });
 
-      const property = await base44.entities.Property.create({
+      const property = await Property.create({
         ...propertyData,
         user_email: email,
         user_phone: phone || user?.phone || '',
@@ -194,7 +196,7 @@ Be realistic, data-driven, and specific to the location and property type.`,
         if (!data.photo_urls?.length && !data.serial_number) return null;
 
         try {
-          const analysis = await base44.integrations.Core.InvokeLLM({
+          const analysis = await InvokeLLM({
             prompt: `Analyze this ${type} component for a property built in ${propertyData.year_built || 2000}. 
 Serial/Model: ${data.serial_number || 'Not provided'}
 
@@ -221,7 +223,7 @@ Consider typical lifespans for ${type} components.`,
             file_urls: data.photo_urls?.length > 0 ? data.photo_urls : undefined
           });
 
-          return base44.entities.PropertyComponent.create({
+          return PropertyComponent.create({
             property_id: property.id,
             component_type: type,
             photo_urls: data.photo_urls || [],
@@ -235,7 +237,7 @@ Consider typical lifespans for ${type} components.`,
           });
         } catch (error) {
           console.error(`Error analyzing ${type}:`, error);
-          return base44.entities.PropertyComponent.create({
+          return PropertyComponent.create({
             property_id: property.id,
             component_type: type,
             photo_urls: data.photo_urls || [],
@@ -258,7 +260,7 @@ Consider typical lifespans for ${type} components.`,
 
       setProgress('Generating AI-enhanced inspection report...');
       
-      const inspectionReportData = await base44.integrations.Core.InvokeLLM({
+      const inspectionReportData = await InvokeLLM({
         prompt: `Generate a comprehensive professional property inspection report for:
 Address: ${propertyData.address}
 Built: ${propertyData.year_built || 'Unknown'}
@@ -290,7 +292,7 @@ Format as a professional, detailed report suitable for real estate transactions.
         }
       });
 
-      await base44.entities.Report.create({
+      await Report.create({
         property_id: property.id,
         report_type: 'inspection',
         report_data: inspectionReportData,
@@ -303,7 +305,7 @@ Format as a professional, detailed report suitable for real estate transactions.
       const marketAdjustment = ((marketRating[0] - 5) * 5) / 100;
       const appraisedValue = (baseRebuildCost + landValue + totalResidualValue) * (1 + marketAdjustment);
 
-      const appraisalReportData = await base44.integrations.Core.InvokeLLM({
+      const appraisalReportData = await InvokeLLM({
         prompt: `Generate a professional property appraisal report for:
 Address: ${propertyData.address}
 
@@ -346,14 +348,14 @@ Be thorough and professional.`,
       appraisalReportData.land_value = landValue;
       appraisalReportData.asset_residual_value = totalResidualValue;
 
-      await base44.entities.Report.create({
+      await Report.create({
         property_id: property.id,
         report_type: 'appraisal',
         report_data: appraisalReportData,
         summary: `Appraised Value: $${appraisedValue.toFixed(2)}`
       });
 
-      await base44.entities.Property.update(property.id, {
+      await Property.update(property.id, {
         total_asset_residual_value: totalResidualValue,
         appraised_value: appraisedValue,
         status: 'completed'
@@ -369,7 +371,7 @@ Be thorough and professional.`,
         } else {
           // Not logged in, redirect to login/signup
           const dashboardUrl = window.location.origin + createPageUrl('Dashboard');
-          base44.auth.redirectToAppLogin(dashboardUrl);
+          void redirectToAppLogin(dashboardUrl);
         }
       }, 2000);
 

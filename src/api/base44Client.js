@@ -936,6 +936,82 @@ const upsertAmplifyUserProfile = async input => {
   return normalizeRecord(definition.modelName, response);
 };
 
+export const getCurrentUserProfile = async () => {
+  if (isAmplifyRuntimeEnabled && (await hasAmplifySession())) {
+    return getAmplifyMe();
+  }
+
+  return callLegacyAuth('me');
+};
+
+/** @param {Record<string, any>} input */
+export const updateCurrentUserProfile = async input => {
+  if (isAmplifyRuntimeEnabled && (await hasAmplifySession())) {
+    return upsertAmplifyUserProfile(input);
+  }
+
+  return callLegacyAuth('updateMe', input);
+};
+
+export const hasAuthenticatedUser = async () => {
+  if (isAmplifyRuntimeEnabled && (await hasAmplifySession())) {
+    return true;
+  }
+
+  if (legacyBase44?.auth?.isAuthenticated) {
+    return legacyBase44.auth.isAuthenticated();
+  }
+
+  return false;
+};
+
+/** @param {string | null | undefined} redirectUrl */
+export const redirectToLogin = async redirectUrl => {
+  if (typeof window !== 'undefined' && isAmplifyRuntimeEnabled) {
+    const targetUrl = redirectUrl || window.location.href;
+    window.location.assign(buildLoginUrl(targetUrl));
+    return;
+  }
+
+  if (legacyBase44?.auth?.redirectToLogin) {
+    return legacyBase44.auth.redirectToLogin(redirectUrl);
+  }
+
+  if (typeof window !== 'undefined') {
+    window.location.assign(window.location.origin);
+  }
+};
+
+/** @param {string | null | undefined} redirectUrl */
+export const redirectToAppLogin = redirectUrl => {
+  if (typeof window === 'undefined') {
+    return Promise.resolve();
+  }
+
+  const targetUrl = redirectUrl || window.location.href;
+  window.location.assign(buildLoginUrl(targetUrl));
+  return Promise.resolve();
+};
+
+/** @param {string | null | undefined} redirectUrl */
+export const logoutCurrentUser = async redirectUrl => {
+  if (isAmplifyRuntimeEnabled && (await hasAmplifySession())) {
+    await signOut();
+    if (redirectUrl) {
+      window.location.assign(redirectUrl);
+    }
+    return;
+  }
+
+  if (legacyBase44?.auth?.logout) {
+    return legacyBase44.auth.logout(redirectUrl);
+  }
+
+  if (redirectUrl) {
+    window.location.assign(redirectUrl);
+  }
+};
+
 const createEntityAdapter = entityName => {
   const definition = getModelDefinition(entityName);
 
@@ -1012,64 +1088,12 @@ const entityAdapterCache = new Map();
 
 const auth = new Proxy(
   {
-    me: async () => {
-      if (isAmplifyRuntimeEnabled && (await hasAmplifySession())) {
-        return getAmplifyMe();
-      }
-      return callLegacyAuth('me');
-    },
-    updateMe: async input => {
-      if (isAmplifyRuntimeEnabled && (await hasAmplifySession())) {
-        return upsertAmplifyUserProfile(input);
-      }
-      return callLegacyAuth('updateMe', input);
-    },
-    isAuthenticated: async () => {
-      if (isAmplifyRuntimeEnabled && (await hasAmplifySession())) {
-        return true;
-      }
-      if (legacyBase44?.auth?.isAuthenticated) {
-        return legacyBase44.auth.isAuthenticated();
-      }
-      return false;
-    },
-    redirectToLogin: async redirectUrl => {
-      if (typeof window !== 'undefined' && isAmplifyRuntimeEnabled) {
-        const targetUrl = redirectUrl || window.location.href;
-        window.location.assign(buildLoginUrl(targetUrl));
-        return;
-      }
-      if (legacyBase44?.auth?.redirectToLogin) {
-        return legacyBase44.auth.redirectToLogin(redirectUrl);
-      }
-      if (typeof window !== 'undefined') {
-        window.location.assign(window.location.origin);
-      }
-    },
-    redirectToAppLogin: redirectUrl => {
-      if (typeof window === 'undefined') {
-        return Promise.resolve();
-      }
-
-      const targetUrl = redirectUrl || window.location.href;
-      window.location.assign(buildLoginUrl(targetUrl));
-      return Promise.resolve();
-    },
-    logout: async redirectUrl => {
-      if (isAmplifyRuntimeEnabled && (await hasAmplifySession())) {
-        await signOut();
-        if (redirectUrl) {
-          window.location.assign(redirectUrl);
-        }
-        return;
-      }
-      if (legacyBase44?.auth?.logout) {
-        return legacyBase44.auth.logout(redirectUrl);
-      }
-      if (redirectUrl) {
-        window.location.assign(redirectUrl);
-      }
-    },
+    me: getCurrentUserProfile,
+    updateMe: updateCurrentUserProfile,
+    isAuthenticated: hasAuthenticatedUser,
+    redirectToLogin,
+    redirectToAppLogin,
+    logout: logoutCurrentUser,
     setToken: async accessToken => {
       if (legacyBase44?.auth?.setToken) {
         return legacyBase44.auth.setToken(accessToken);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin, updateCurrentUserProfile } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -22,7 +22,7 @@ export default function SMSOptIn() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await getCurrentUserProfile();
         setUser(currentUser);
         setPhoneNumber(currentUser.sms_phone_number || currentUser.phone || currentUser.business_phone || '');
         
@@ -66,7 +66,7 @@ export default function SMSOptIn() {
       if (!user) {
         // If not logged in, redirect to login
         alert('Please sign in to opt-in to SMS notifications');
-        base44.auth.redirectToAppLogin(window.location.href);
+        void redirectToAppLogin(window.location.href);
         return;
       }
 
@@ -81,7 +81,7 @@ export default function SMSOptIn() {
       }
 
       // Update user with SMS opt-in
-      await base44.auth.updateMe({
+      await updateCurrentUserProfile({
         sms_phone_number: phoneNumber,
         sms_consent: true,
         sms_consent_date: new Date().toISOString(),
@@ -108,7 +108,7 @@ export default function SMSOptIn() {
 
     setSubmitting(true);
     try {
-      await base44.auth.updateMe({
+      await updateCurrentUserProfile({
         sms_consent: false,
         sms_opt_in: false
       });

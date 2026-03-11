@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
-import { useNavigate } from 'react-router-dom';
+import { redirectToAppLogin } from '@/api/base44Client';
+import { PendingUser, ServiceListing } from '@/api/entities';
+import { searchGooglePlaces, sendSMSVerification, verifySMSCode } from '@/api/functions';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +11,6 @@ import { Loader2, Building2, MapPin, Phone, CheckCircle, Search } from 'lucide-r
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 export default function ClaimBusinessSection() {
-  const navigate = useNavigate();
   const [zipCode, setZipCode] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [searching, setSearching] = useState(false);
@@ -43,7 +43,7 @@ export default function ClaimBusinessSection() {
     setBusinesses([]);
 
     try {
-      const response = await base44.functions.invoke('searchGooglePlaces', {
+      const response = await searchGooglePlaces({
         query: `${businessName} ${zipCode}`,
         location: zipCode
       });
@@ -62,7 +62,7 @@ export default function ClaimBusinessSection() {
   const handleClaimBusiness = async (business) => {
     // Check if already claimed
     try {
-      const existingListings = await base44.entities.ServiceListing.filter({
+      const existingListings = await ServiceListing.filter({
         business_name: business.name
       });
 
@@ -88,9 +88,7 @@ export default function ClaimBusinessSection() {
 
     setSendingCode(true);
     try {
-      await base44.functions.invoke('sendSMSVerification', {
-        phoneNumber: phoneNumber
-      });
+      await sendSMSVerification(phoneNumber);
 
       alert('Verification code sent! Please check your phone.');
       setClaimStep(2);
@@ -115,7 +113,7 @@ export default function ClaimBusinessSection() {
     setVerifying(true);
     try {
       // Verify the code
-      const verifyResponse = await base44.functions.invoke('verifySMSCode', {
+      const verifyResponse = await verifySMSCode({
         code: verificationCode,
         placeId: selectedBusiness.placeId,
         businessData: selectedBusiness
@@ -128,7 +126,7 @@ export default function ClaimBusinessSection() {
       }
 
       // Create pending user with business data
-      const pendingUser = await base44.entities.PendingUser.create({
+      const pendingUser = await PendingUser.create({
         email: email.toLowerCase().trim(),
         full_name: selectedBusiness.name,
         phone: phoneNumber,
@@ -153,7 +151,7 @@ export default function ClaimBusinessSection() {
         '&name=' + encodeURIComponent(selectedBusiness.name) +
         '&phone=' + encodeURIComponent(phoneNumber);
 
-      base44.auth.redirectToAppLogin(signupUrl);
+      void redirectToAppLogin(signupUrl);
     } catch (error) {
       console.error('Error verifying:', error);
       alert('Verification failed. Please try again.');
