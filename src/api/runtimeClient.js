@@ -1260,6 +1260,13 @@ const getAmplifySession = async () => {
 
 const hasAmplifySession = async () => Boolean(await getAmplifySession());
 
+const hasAmplifyAdminGroup = groups => {
+  const normalizedGroups = Array.isArray(groups) ? groups : [groups].filter(Boolean);
+  return normalizedGroups.includes('ADMINS');
+};
+
+const resolveAmplifyAppRole = groups => (hasAmplifyAdminGroup(groups) ? 'admin' : 'member');
+
 const getReadAuthMode = async definition => {
   const session = await getAmplifySession();
   if (session) {
@@ -1381,6 +1388,7 @@ const getAmplifyMe = async () => {
   const userContext = await resolveUserContext();
   const profile = userContext.email ? await findUserProfileByEmail(userContext.email) : null;
   return {
+    ...profile,
     id: profile?.id || userContext.currentUser?.userId,
     email: userContext.email,
     full_name:
@@ -1389,8 +1397,7 @@ const getAmplifyMe = async () => {
       [userContext.attributes?.given_name, userContext.attributes?.family_name].filter(Boolean).join(' ') ||
       userContext.email,
     phone: profile?.phone || userContext.attributes?.phone_number || null,
-    role: userContext.groups.includes('ADMINS') ? 'admin' : profile?.role || 'member',
-    ...profile,
+    role: resolveAmplifyAppRole(userContext.groups),
   };
 };
 
@@ -1417,11 +1424,11 @@ const upsertAmplifyUserProfile = async input => {
   const normalizedInput = normalizeModelInput(definition.modelName, input);
   const existingProfile = userContext.email ? await findUserProfileByEmail(userContext.email) : null;
   const baseInput = {
+    ...normalizedInput,
     email: userContext.email,
     full_name: normalizedInput.full_name || existingProfile?.full_name || userContext.attributes?.name || userContext.email,
     phone: normalizedInput.phone || existingProfile?.phone || userContext.attributes?.phone_number,
-    role: userContext.groups.includes('ADMINS') ? 'admin' : normalizedInput.role || existingProfile?.role || 'member',
-    ...normalizedInput,
+    role: resolveAmplifyAppRole(userContext.groups),
   };
 
   const operationName = existingProfile ? definition.updateOperation : definition.createOperation;

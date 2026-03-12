@@ -336,7 +336,8 @@ export default function Admin() {
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-3">Admin Access Required</h2>
             <p className="text-gray-600 mb-6">
-              You don't have permission to access this page.
+              This page requires Cognito <code>ADMINS</code> group membership. If you were just added,
+              sign out and sign back in to refresh your session.
             </p>
             <Link to={createPageUrl('Dashboard')}>
               <Button className="bg-[#1e3a5f] hover:bg-[#2a4a7f]">
