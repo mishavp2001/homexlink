@@ -1,12 +1,14 @@
 /// <reference lib="deno.ns" />
 import { Resend } from 'npm:resend@3.2.0';
 import { requireAmplifyUser, toErrorResponse } from './_amplifyAuth.ts';
+import { requireEnv } from './_env.ts';
 
-const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
+const createResendClient = () => new Resend(requireEnv('RESEND_API_KEY'));
 
 Deno.serve(async (req) => {
   try {
     await requireAmplifyUser(req);
+    const resend = createResendClient();
 
     const { to, subject, html, text, from } = await req.json();
 

@@ -1,7 +1,5 @@
-declare const Deno: {
-  env: { get(name: string): string | undefined };
-  serve(handler: (req: Request) => Response | Promise<Response>): void;
-};
+/// <reference lib="deno.ns" />
+import { getEnv } from './_env.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -11,7 +9,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Query is required' }, { status: 400 });
     }
 
-    const apiKey = Deno.env.get('YOUTUBE_API_KEY');
+    const apiKey = getEnv('YOUTUBE_API_KEY');
     if (!apiKey) {
       return Response.json({ error: 'YouTube API key not configured' }, { status: 500 });
     }

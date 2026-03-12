@@ -1,5 +1,6 @@
 import { HttpError, requireAmplifyUser } from './_amplifyAuth.ts';
 import puppeteer from 'npm:puppeteer@23.11.1';
+import { getEnv } from './_env.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -9,7 +10,7 @@ Deno.serve(async (req) => {
       throw new HttpError(403, 'Admin access required');
     }
 
-    const appUrl = Deno.env.get('APP_URL') || 'https://homexrei.com';
+    const appUrl = getEnv('APP_URL') || 'https://homexrei.com';
     const logs = [];
 
     const log = (message) => {

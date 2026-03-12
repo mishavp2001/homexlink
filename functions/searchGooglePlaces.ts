@@ -1,4 +1,5 @@
 /// <reference lib="deno.ns" />
+import { getEnv } from './_env.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -6,7 +7,7 @@ Deno.serve(async (req) => {
     
     console.log('Searching Google Places:', { query, location });
     
-    const apiKey = Deno.env.get('GOOGLE_PLACES_API_KEY');
+    const apiKey = getEnv('GOOGLE_PLACES_API_KEY');
     if (!apiKey) {
       console.error('GOOGLE_PLACES_API_KEY not set');
       return Response.json({ error: 'Google Places API key not configured' }, { status: 500 });

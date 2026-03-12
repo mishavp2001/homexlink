@@ -2,6 +2,7 @@
 import { Resend } from 'npm:resend@3.2.0';
 import { HttpError, requireAmplifyUser, toErrorResponse } from './_amplifyAuth.ts';
 import { listAmplifyPrivateItems } from './_amplifyPrivateData.ts';
+import { requireEnv } from './_env.ts';
 
 type MaintenanceTaskRecord = {
   id: string;
@@ -25,7 +26,6 @@ type SettingRecord = {
   setting_value?: unknown;
 };
 
-const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 const fallbackAppOrigin = 'https://homexrei.com';
 const resendFrom = 'HomeXREI Admin <onboarding@resend.dev>';
 
@@ -96,6 +96,8 @@ Deno.serve(async (req) => {
     if (!user.isAdmin) {
       throw new HttpError(403, 'Forbidden: Admin access required');
     }
+
+    const resend = new Resend(requireEnv('RESEND_API_KEY'));
 
     const [tasks, properties, settings] = await Promise.all([
       listAmplifyPrivateItems({

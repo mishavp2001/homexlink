@@ -2,8 +2,9 @@
 import { requireAmplifyUser, toErrorResponse } from './_amplifyAuth.ts';
 import { listAmplifyPublicItems } from './_amplifyPublicData.ts';
 import Stripe from 'npm:stripe';
+import { requireEnv } from './_env.ts';
 
-const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY'));
+const createStripeClient = () => new Stripe(requireEnv('STRIPE_SECRET_KEY'));
 
 const FALLBACK_APP_URL = 'https://homexrei.com';
 
@@ -69,6 +70,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Cannot purchase your own deal' }, { status: 400 });
     }
 
+    const stripe = createStripeClient();
     const appUrl = resolveAppUrl(req);
     
     console.log('Using app URL for checkout:', appUrl);

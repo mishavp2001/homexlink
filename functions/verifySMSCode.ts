@@ -1,6 +1,7 @@
 /// <reference lib="deno.ns" />
 import { getAmplifyUser, toErrorResponse, type VerifiedAmplifyUser } from './_amplifyAuth.ts';
 import { listAmplifyPrivateItems, queryAmplifyPrivateData } from './_amplifyPrivateData.ts';
+import { getEnv } from './_env.ts';
 
 const LIST_USER_PROFILES_QUERY = `
   query ListUserProfiles($filter: ModelUserProfileFilterInput, $limit: Int, $nextToken: String) {
@@ -203,9 +204,9 @@ Deno.serve(async (req: Request) => {
     }
     
     console.log('Verifying phone:', businessData.phone);
-    const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-    const verifySid = Deno.env.get('TWILIO_VERIFY_SERVICE_SID');
+    const accountSid = getEnv('TWILIO_ACCOUNT_SID');
+    const authToken = getEnv('TWILIO_AUTH_TOKEN');
+    const verifySid = getEnv('TWILIO_VERIFY_SERVICE_SID');
 
     if (!accountSid || !authToken || !verifySid) {
       return Response.json({ error: 'Twilio Verify not configured' }, { status: 500 });

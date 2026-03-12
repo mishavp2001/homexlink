@@ -3,8 +3,9 @@ import Stripe from 'npm:stripe@14.11.0';
 import { Resend } from 'npm:resend@3.2.0';
 import { requireAmplifyUser, toErrorResponse } from './_amplifyAuth.ts';
 import { listAmplifyPrivateItems, queryAmplifyPrivateData } from './_amplifyPrivateData.ts';
+import { getEnv, requireEnv } from './_env.ts';
 
-const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
+const createResendClient = () => new Resend(requireEnv('RESEND_API_KEY'));
 
 const LIST_USER_PROFILES_QUERY = `
   query ListUserProfiles($filter: ModelUserProfileFilterInput, $limit: Int, $nextToken: String) {
@@ -99,7 +100,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Session ID required' }, { status: 400 });
     }
 
-    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
+    const stripeSecretKey = getEnv('STRIPE_SECRET_KEY');
     if (!stripeSecretKey) {
       return Response.json({ error: 'Stripe not configured' }, { status: 500 });
     }
@@ -107,6 +108,7 @@ Deno.serve(async (req) => {
     const stripe = new Stripe(stripeSecretKey, {
       apiVersion: '2023-10-16',
     });
+    const resend = createResendClient();
 
     console.log('Verifying payment for session:', sessionId);
 

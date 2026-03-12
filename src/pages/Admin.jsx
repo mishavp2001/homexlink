@@ -38,6 +38,23 @@ const hasCategoryChanges = (existingCategory, nextData) => CATEGORY_COMPARISON_F
   return (existingCategory[field] ?? null) !== (nextData[field] ?? null);
 });
 
+const getOperationErrorMessage = error => {
+  if (error?.message) {
+    return error.message;
+  }
+
+  const firstError = error?.errors?.[0]?.message
+    || error?.data?.errors?.[0]?.message
+    || error?.cause?.errors?.[0]?.message
+    || error?.details?.[0]?.message;
+
+  if (firstError) {
+    return firstError;
+  }
+
+  return 'Unknown error';
+};
+
 export default function Admin() {
   const queryClient = useQueryClient();
   const [user, setUser] = useState(null);
@@ -234,17 +251,19 @@ export default function Admin() {
             await Category.update(existingCategory.id, updateData);
             updatedCount += 1;
           } catch (error) {
-            errorMessages.push(`Row ${row.csvRowNumber}: failed to update ${row.data.name} (${error.message}).`);
+            errorMessages.push(`Row ${row.csvRowNumber}: failed to update ${row.data.name} (${getOperationErrorMessage(error)}).`);
           }
 
           continue;
         }
 
         try {
-          await Category.create(row.data);
+          const createData = { ...row.data };
+          delete createData.id;
+          await Category.create(createData);
           createdCount += 1;
         } catch (error) {
-          errorMessages.push(`Row ${row.csvRowNumber}: failed to create ${row.data.name} (${error.message}).`);
+          errorMessages.push(`Row ${row.csvRowNumber}: failed to create ${row.data.name} (${getOperationErrorMessage(error)}).`);
         }
       }
 

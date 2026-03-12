@@ -1,5 +1,6 @@
 /// <reference lib="deno.ns" />
 import { requireAmplifyUser, toErrorResponse } from './_amplifyAuth.ts';
+import { getEnv } from './_env.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -11,7 +12,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Address is required' }, { status: 400 });
     }
 
-    const apiKey = Deno.env.get('RAPIDAPI_KEY');
+    const apiKey = getEnv('RAPIDAPI_KEY');
     if (!apiKey) {
       return Response.json({ error: 'RapidAPI key not configured' }, { status: 500 });
     }

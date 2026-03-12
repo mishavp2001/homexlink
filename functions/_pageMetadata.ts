@@ -1,8 +1,9 @@
 /// <reference lib="deno.ns" />
 import OpenAI from 'npm:openai';
 import { listAmplifyPrivateItems, queryAmplifyPrivateData } from './_amplifyPrivateData.ts';
+import { getEnv, getFirstEnv } from './_env.ts';
 
-const METADATA_MODEL = Deno.env.get('OPENAI_METADATA_MODEL') || Deno.env.get('OPENAI_MODEL') || 'gpt-4o-mini';
+const METADATA_MODEL = getFirstEnv('OPENAI_METADATA_MODEL', 'OPENAI_MODEL') || 'gpt-4o-mini';
 
 const LIST_PAGE_METADATA_QUERY = `
   query ListPageMetadata($filter: ModelPageMetadataFilterInput, $limit: Int, $nextToken: String) {
@@ -90,7 +91,7 @@ type PageMetadataMutationResponse = {
 };
 
 const getOpenAIClient = () => {
-  const apiKey = Deno.env.get('OPENAI_API_KEY');
+  const apiKey = getEnv('OPENAI_API_KEY');
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY is not configured.');
   }

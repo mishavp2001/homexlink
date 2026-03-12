@@ -1,6 +1,7 @@
 /// <reference lib="deno.ns" />
 import { requireAmplifyUser, toErrorResponse } from './_amplifyAuth.ts';
 import Stripe from 'npm:stripe@14.11.0';
+import { getEnv } from './_env.ts';
 
 const FALLBACK_APP_URL = 'https://homexrei.com';
 
@@ -30,7 +31,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Invalid amount' }, { status: 400 });
     }
 
-    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
+    const stripeSecretKey = getEnv('STRIPE_SECRET_KEY');
     if (!stripeSecretKey) {
       return Response.json({ error: 'Stripe not configured' }, { status: 500 });
     }

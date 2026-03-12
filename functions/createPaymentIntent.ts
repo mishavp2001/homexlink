@@ -1,14 +1,16 @@
 /// <reference lib="deno.ns" />
 import { requireAmplifyUser, toErrorResponse } from './_amplifyAuth.ts';
 import Stripe from 'npm:stripe@14.11.0';
+import { requireEnv } from './_env.ts';
 
-const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY'), {
+const createStripeClient = () => new Stripe(requireEnv('STRIPE_SECRET_KEY'), {
   apiVersion: '2023-10-16',
 });
 
 Deno.serve(async (req) => {
   try {
     const user = await requireAmplifyUser(req);
+    const stripe = createStripeClient();
 
     const { amount } = await req.json();
     

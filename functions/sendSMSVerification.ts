@@ -1,12 +1,13 @@
 /// <reference lib="deno.ns" />
+import { getEnv } from './_env.ts';
 
 Deno.serve(async (req) => {
   try {
     const { phoneNumber } = await req.json();
     
-    const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-    const verifySid = Deno.env.get('TWILIO_VERIFY_SERVICE_SID');
+    const accountSid = getEnv('TWILIO_ACCOUNT_SID');
+    const authToken = getEnv('TWILIO_AUTH_TOKEN');
+    const verifySid = getEnv('TWILIO_VERIFY_SERVICE_SID');
 
     if (!accountSid || !authToken || !verifySid) {
       return Response.json({ error: 'Twilio Verify not configured' }, { status: 500 });

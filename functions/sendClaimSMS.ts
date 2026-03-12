@@ -1,9 +1,6 @@
 /// <reference lib="deno.ns" />
 import { HttpError, requireAmplifyUser, toErrorResponse } from './_amplifyAuth.ts';
-
-const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
-const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
-const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER');
+import { getEnv } from './_env.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -19,18 +16,26 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Phone number and claim URL are required' }, { status: 400 });
     }
 
+    const accountSid = getEnv('TWILIO_ACCOUNT_SID');
+    const authToken = getEnv('TWILIO_AUTH_TOKEN');
+    const fromPhoneNumber = getEnv('TWILIO_PHONE_NUMBER');
+
+    if (!accountSid || !authToken || !fromPhoneNumber) {
+      return Response.json({ error: 'Twilio SMS not configured' }, { status: 500 });
+    }
+
     const message = `Hi! We'd like to invite "${businessName}" to join our home services platform. Claim your free business profile here: ${claimUrl}`;
 
-    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
+    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
     const formData = new URLSearchParams();
     formData.append('To', phoneNumber);
-    formData.append('From', TWILIO_PHONE_NUMBER);
+    formData.append('From', fromPhoneNumber);
     formData.append('Body', message);
 
     const response = await fetch(twilioUrl, {
       method: 'POST',
       headers: {
-        'Authorization': 'Basic ' + btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`),
+        'Authorization': 'Basic ' + btoa(`${accountSid}:${authToken}`),
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: formData.toString(),

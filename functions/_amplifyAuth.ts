@@ -1,5 +1,6 @@
 /// <reference lib="deno.ns" />
 import amplifyOutputs from '../amplify_outputs.json' with { type: 'json' };
+import { getEnv, getFirstEnv } from './_env.ts';
 
 const encoder = new TextEncoder();
 const adminGroupName = 'ADMINS';
@@ -41,9 +42,9 @@ const cryptoKeyCache = new Map<string, Promise<CryptoKey>>();
 
 const getAmplifyAuthConfig = () => {
   const authConfig = amplifyOutputs?.auth || {};
-  const region = Deno.env.get('AMPLIFY_AUTH_REGION') || Deno.env.get('AWS_REGION') || authConfig.aws_region;
-  const userPoolId = Deno.env.get('AMPLIFY_AUTH_USER_POOL_ID') || authConfig.user_pool_id;
-  const clientId = Deno.env.get('AMPLIFY_AUTH_USER_POOL_CLIENT_ID') || authConfig.user_pool_client_id;
+  const region = getFirstEnv('AMPLIFY_AUTH_REGION', 'AWS_REGION') || authConfig.aws_region;
+  const userPoolId = getEnv('AMPLIFY_AUTH_USER_POOL_ID') || authConfig.user_pool_id;
+  const clientId = getEnv('AMPLIFY_AUTH_USER_POOL_CLIENT_ID') || authConfig.user_pool_client_id;
 
   if (!region || !userPoolId || !clientId) {
     throw new Error('Amplify Cognito configuration is missing.');

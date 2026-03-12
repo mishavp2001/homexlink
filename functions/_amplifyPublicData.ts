@@ -1,18 +1,15 @@
 /// <reference lib="deno.ns" />
 import amplifyOutputs from '../amplify_outputs.json' with { type: 'json' };
+import { getFirstEnv } from './_env.ts';
 
 const amplifyDataConfig = amplifyOutputs?.data || {};
 
 const getAmplifyPublicDataConfig = () => {
   const endpoint =
-    Deno.env.get('AMPLIFY_DATA_URL') ||
-    Deno.env.get('AMPLIFY_GRAPHQL_ENDPOINT') ||
-    Deno.env.get('VITE_AMPLIFY_GRAPHQL_ENDPOINT') ||
+    getFirstEnv('AMPLIFY_DATA_URL', 'AMPLIFY_GRAPHQL_ENDPOINT', 'VITE_AMPLIFY_GRAPHQL_ENDPOINT') ||
     amplifyDataConfig.url;
   const apiKey =
-    Deno.env.get('AMPLIFY_DATA_API_KEY') ||
-    Deno.env.get('AMPLIFY_API_KEY') ||
-    Deno.env.get('VITE_AMPLIFY_API_KEY') ||
+    getFirstEnv('AMPLIFY_DATA_API_KEY', 'AMPLIFY_API_KEY', 'VITE_AMPLIFY_API_KEY') ||
     amplifyDataConfig.api_key;
 
   if (!endpoint || !apiKey) {

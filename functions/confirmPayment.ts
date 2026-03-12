@@ -3,11 +3,12 @@ import Stripe from 'npm:stripe@14.11.0';
 import { Resend } from 'npm:resend@3.2.0';
 import { requireAmplifyUser, toErrorResponse, type VerifiedAmplifyUser } from './_amplifyAuth.ts';
 import { listAmplifyPrivateItems, queryAmplifyPrivateData } from './_amplifyPrivateData.ts';
+import { requireEnv } from './_env.ts';
 
-const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY'), {
+const createStripeClient = () => new Stripe(requireEnv('STRIPE_SECRET_KEY'), {
   apiVersion: '2023-10-16',
 });
-const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
+const createResendClient = () => new Resend(requireEnv('RESEND_API_KEY'));
 
 const LIST_USER_PROFILES_QUERY = `
   query ListUserProfiles($filter: ModelUserProfileFilterInput, $limit: Int, $nextToken: String) {
@@ -104,6 +105,9 @@ Deno.serve(async (req: Request) => {
     if (!paymentIntentId) {
       return Response.json({ error: 'Payment intent ID required' }, { status: 400 });
     }
+
+    const stripe = createStripeClient();
+    const resend = createResendClient();
 
     // Retrieve payment intent to verify
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
