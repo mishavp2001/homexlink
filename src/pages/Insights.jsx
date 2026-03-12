@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin } from '@/api/client';
 import { Category, Insight } from '@/api/entities';
 import { getLocationFromIP, searchYouTubeVideos } from '@/api/functions';
 import { UploadFile } from '@/api/integrations';

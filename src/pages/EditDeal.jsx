@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin } from '@/api/client';
 import { Category, Deal } from '@/api/entities';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';

@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { logoutCurrentUser } from '@/api/base44Client';
+import { logoutCurrentUser } from '@/api/client';
 import { Category, Message, ServiceListing } from '@/api/entities';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/components/lib/AuthContext';

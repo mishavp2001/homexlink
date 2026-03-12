@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getCurrentUserProfile, redirectToAppLogin, updateCurrentUserProfile } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin, updateCurrentUserProfile } from '@/api/client';
 import { ProviderSettings } from '@/api/entities';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';

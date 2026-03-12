@@ -6,7 +6,7 @@ import { Home, Wrench, MapPin, Phone, Mail, Bed, Bath, Maximize, Calendar, Moon,
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin } from '@/api/client';
 import { SavedDeal } from '@/api/entities';
 import { getUserByEmail } from '@/api/functions';
 

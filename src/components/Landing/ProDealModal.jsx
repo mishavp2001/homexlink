@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { redirectToAppLogin } from '@/api/base44Client';
+import { redirectToAppLogin } from '@/api/client';
 import { Category, PendingUser } from '@/api/entities';
 import { UploadFile } from '@/api/integrations';
 import { useQuery } from '@tanstack/react-query';

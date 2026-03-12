@@ -1,3 +1,3 @@
-import { base44 } from './base44Client';
+import { appLogs } from './client';
 
-export const logUserInApp = pageName => base44.appLogs.logUserInApp(pageName);
+export const logUserInApp = pageName => appLogs.logUserInApp(pageName);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { base44, getCurrentUserProfile } from '@/api/base44Client';
+import { getCurrentUserProfile } from '@/api/client';
+import { addMessage, createConversation, getConversation, subscribeToConversation } from '@/api/agents';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -46,7 +47,7 @@ export default function ChatWidget({ isOpen, setIsOpen, inNavigation = false }) 
   useEffect(() => {
     if (!conversationId) return;
 
-    const unsubscribe = base44.agents.subscribeToConversation(conversationId, (data) => {
+    const unsubscribe = subscribeToConversation(conversationId, (data) => {
       setMessages(data.messages || []);
     });
 
@@ -59,7 +60,7 @@ export default function ChatWidget({ isOpen, setIsOpen, inNavigation = false }) 
 
   const initConversation = async () => {
     try {
-      const conversation = await base44.agents.createConversation({
+      const conversation = await createConversation({
         agent_name: 'website_assistant',
         metadata: {
           name: 'Website Help',
@@ -81,8 +82,8 @@ export default function ChatWidget({ isOpen, setIsOpen, inNavigation = false }) 
     setSending(true);
 
     try {
-      const conversation = await base44.agents.getConversation(conversationId);
-      await base44.agents.addMessage(conversation, {
+      const conversation = await getConversation(conversationId);
+      await addMessage(conversation, {
         role: 'user',
         content: userMessage
       });

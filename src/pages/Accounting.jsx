@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getCurrentUserProfile } from '@/api/base44Client';
+import { getCurrentUserProfile } from '@/api/client';
 import { Property, Transaction } from '@/api/entities';
 import { UploadFile } from '@/api/integrations';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';

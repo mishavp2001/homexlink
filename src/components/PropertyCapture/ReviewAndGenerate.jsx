@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin } from '@/api/client';
 import { Property, PropertyComponent, Report } from '@/api/entities';
 import { InvokeLLM } from '@/api/integrations';
 import { Button } from '@/components/ui/button';

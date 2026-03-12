@@ -1,6 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { base44, getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin } from '@/api/client';
+import { Booking, Deal, Message, Review, ServiceListing } from '@/api/entities';
+import { SendEmail } from '@/api/integrations';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -67,15 +69,15 @@ export default function ServiceProfile() {
     queryFn: async () => {
       try {
         if (serviceId) {
-          const services = await base44.entities.ServiceListing.filter({ id: serviceId });
+          const services = await ServiceListing.filter({ id: serviceId });
           return services[0] || null;
         } else if (expertEmail) {
           const decodedEmail = decodeURIComponent(expertEmail);
-          const allServices = await base44.entities.ServiceListing.list();
+          const allServices = await ServiceListing.list();
           return allServices.find(s => s.expert_email === decodedEmail) || null;
         } else if (expertName) {
           const decodedName = decodeURIComponent(expertName);
-          const allServices = await base44.entities.ServiceListing.list();
+          const allServices = await ServiceListing.list();
           return allServices.find(s => s.expert_name === decodedName) || null;
         }
         return null;
@@ -91,7 +93,7 @@ export default function ServiceProfile() {
     queryKey: ['providerDeals', service?.expert_email],
     queryFn: async () => {
       if (!service) return [];
-      return await base44.entities.Deal.filter({ 
+      return await Deal.filter({ 
         user_email: service.expert_email,
         status: 'active'
       }, '-created_date');
@@ -103,7 +105,7 @@ export default function ServiceProfile() {
     queryKey: ['similarProviders', service?.service_category, service?.expert_email],
     queryFn: async () => {
       if (!service) return [];
-      const providers = await base44.entities.ServiceListing.filter({
+      const providers = await ServiceListing.filter({
         service_category: service.service_category,
         status: 'active'
       }, '-average_rating');
@@ -116,7 +118,7 @@ export default function ServiceProfile() {
     queryKey: ['relatedDeals', service?.service_category],
     queryFn: async () => {
       if (!service) return [];
-      const deals = await base44.entities.Deal.filter({
+      const deals = await Deal.filter({
         service_category: service.service_category,
         deal_type: 'service_deal',
         status: 'active'
@@ -130,7 +132,7 @@ export default function ServiceProfile() {
     queryKey: ['reviews', service?.id],
     queryFn: async () => {
       if (!service) return [];
-      return await base44.entities.Review.filter(
+      return await Review.filter(
         { service_listing_id: service.id },
         '-created_date'
       );
@@ -139,7 +141,7 @@ export default function ServiceProfile() {
   });
 
   const createBookingMutation = useMutation({
-    mutationFn: (data) => base44.entities.Booking.create(data),
+    mutationFn: (data) => Booking.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries(['bookings']);
       setBookingSuccess(true);
@@ -200,7 +202,7 @@ export default function ServiceProfile() {
       console.log('=== SERVICE BOOKING REQUEST DEBUG ===');
       console.log('1. Creating booking record...');
       
-      const newBooking = await base44.entities.Booking.create(bookingPayload);
+      const newBooking = await Booking.create(bookingPayload);
       console.log('✅ Booking created:', newBooking.id);
       
       const bookingRequestUrl = `${window.location.origin}/dashboard`;
@@ -231,7 +233,7 @@ export default function ServiceProfile() {
       console.log('2. Creating in-app message...');
       
       try {
-        const message = await base44.entities.Message.create({
+        const message = await Message.create({
           sender_email: currentUser.email,
           sender_name: bookingData.renter_name || currentUser.full_name,
           recipient_email: service.expert_email,
@@ -251,7 +253,7 @@ export default function ServiceProfile() {
       console.log('3. Sending email notification...');
       
       try {
-        await base44.integrations.Core.SendEmail({
+        await SendEmail({
           to: service.expert_email,
           subject: messageSubject,
           body: messageBody
@@ -294,12 +296,12 @@ export default function ServiceProfile() {
 
   const createReviewMutation = useMutation({
     mutationFn: async (reviewData) => {
-      const review = await base44.entities.Review.create(reviewData);
+      const review = await Review.create(reviewData);
       const newReviewCount = (service.review_count || 0) + 1;
       const currentTotal = (service.average_rating || 0) * (service.review_count || 0);
       const newAverage = (currentTotal + reviewData.rating) / newReviewCount;
       
-      await base44.entities.ServiceListing.update(service.id, {
+      await ServiceListing.update(service.id, {
         average_rating: parseFloat(newAverage.toFixed(2)),
         review_count: newReviewCount
       });
@@ -317,7 +319,7 @@ export default function ServiceProfile() {
   const markHelpfulMutation = useMutation({
     mutationFn: (reviewId) => {
       const review = reviews.find(r => r.id === reviewId);
-      return base44.entities.Review.update(reviewId, {
+      return Review.update(reviewId, {
         helpful_count: (review.helpful_count || 0) + 1
       });
     },

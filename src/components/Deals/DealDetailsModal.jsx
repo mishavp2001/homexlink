@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { base44, redirectToAppLogin } from '@/api/base44Client';
+import { redirectToAppLogin } from '@/api/client';
+import { Message, Offer } from '@/api/entities';
+import { createDealCheckout, generatePropertyVideo } from '@/api/functions';
+import { SendEmail } from '@/api/integrations';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -29,7 +32,7 @@ export default function DealDetailsModal({ deal, isOpen, onClose, isOwner, onEdi
   const [submittingOffer, setSubmittingOffer] = useState(false);
 
   const sendMessageMutation = useMutation({
-    mutationFn: (data) => base44.entities.Message.create(data),
+    mutationFn: (data) => Message.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries(['messages']);
       setShowContactForm(false);
@@ -86,7 +89,7 @@ export default function DealDetailsModal({ deal, isOpen, onClose, isOwner, onEdi
     try {
       console.log('🎬 Starting video generation for deal:', deal.id);
       
-      const response = await base44.functions.invoke('generatePropertyVideo', {
+      const response = await generatePropertyVideo({
         dealId: deal.id
       });
 
@@ -121,7 +124,7 @@ export default function DealDetailsModal({ deal, isOpen, onClose, isOwner, onEdi
       try {
         console.log('=== CREATING OFFER ===');
         
-        const offer = await base44.entities.Offer.create(offerData);
+        const offer = await Offer.create(offerData);
         console.log('✅ Offer created:', offer.id);
         
         const emailSubject = `New Purchase Offer - ${deal.location}`;
@@ -152,7 +155,7 @@ This is an automated message from HomeXREI.
 `;
 
         console.log('Sending email to property owner...');
-        await base44.integrations.Core.SendEmail({
+        await SendEmail({
           to: deal.user_email,
           subject: emailSubject,
           body: emailBody
@@ -160,7 +163,7 @@ This is an automated message from HomeXREI.
         console.log('✅ Email sent to owner');
         
         console.log('Creating in-app message...');
-        await base44.entities.Message.create({
+        await Message.create({
           sender_email: currentUser.email,
           sender_name: offerData.buyer_name,
           recipient_email: deal.user_email,
@@ -473,7 +476,7 @@ This is an automated message from HomeXREI.
                 }
                 
                 try {
-                  const response = await base44.functions.invoke('createDealCheckout', {
+                  const response = await createDealCheckout({
                     dealId: deal.id
                   });
                   

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { redirectToAppLogin } from '@/api/base44Client';
+import { redirectToAppLogin } from '@/api/client';
 import { Deal, Review, ServiceListing } from '@/api/entities';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';

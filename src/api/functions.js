@@ -1,6 +1,6 @@
-import { base44 } from './base44Client';
+import { functions } from './client';
 
-export const invokeFunction = (functionName, data) => base44.functions.invoke(functionName, data);
+export const invokeFunction = (functionName, data) => functions.invoke(functionName, data);
 
 export const searchGooglePlaces = ({ query, location }) =>
   invokeFunction('searchGooglePlaces', {
@@ -13,6 +13,8 @@ export const getLocationFromIP = () => invokeFunction('getLocationFromIP', {});
 export const getServiceProviders = () => invokeFunction('getServiceProviders', {});
 
 export const runAutomation = () => invokeFunction('runAutomation', {});
+
+export const sendEmail = input => invokeFunction('sendEmail', input);
 
 export const getUserByEmail = ({ email }) =>
   invokeFunction('getUserByEmail', {
@@ -29,6 +31,11 @@ export const createCheckoutSession = input => invokeFunction('createCheckoutSess
 export const verifyPayment = ({ sessionId }) =>
   invokeFunction('verifyPayment', {
     sessionId,
+  });
+
+export const createDealCheckout = ({ dealId }) =>
+  invokeFunction('createDealCheckout', {
+    dealId,
   });
 
 export const searchYouTubeVideos = ({ query, maxResults }) =>

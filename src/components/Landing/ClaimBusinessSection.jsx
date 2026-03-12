@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { redirectToAppLogin } from '@/api/base44Client';
+import { redirectToAppLogin } from '@/api/client';
 import { PendingUser, ServiceListing } from '@/api/entities';
 import { searchGooglePlaces, sendSMSVerification, verifySMSCode } from '@/api/functions';
 import { createPageUrl } from '@/utils';

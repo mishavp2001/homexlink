@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { base44, getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin } from '@/api/client';
+import { Message } from '@/api/entities';
+import { sendEmail } from '@/api/functions';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -70,7 +72,7 @@ export default function Messages() {
       if (!user) return [];
       try {
         // Fetch all messages
-        const messages = await base44.entities.Message.list('-created_date');
+        const messages = await Message.list('-created_date');
         // Filter to only messages involving this user
         return messages.filter(m => 
           m.sender_email === user.email || m.recipient_email === user.email
@@ -86,11 +88,11 @@ export default function Messages() {
 
   const sendMessageMutation = useMutation({
     mutationFn: async (data) => {
-      const result = await base44.entities.Message.create(data);
+      const result = await Message.create(data);
       
       // Send email notification
       try {
-        await base44.functions.invoke('sendEmail', {
+        await sendEmail({
           to: data.recipient_email,
           subject: `New Message: ${data.subject}`,
           html: `
@@ -120,7 +122,7 @@ export default function Messages() {
   });
 
   const markAsReadMutation = useMutation({
-    mutationFn: (id) => base44.entities.Message.update(id, { is_read: true }),
+    mutationFn: (id) => Message.update(id, { is_read: true }),
     onSuccess: () => {
       queryClient.invalidateQueries(['messages']);
     },
@@ -130,7 +132,7 @@ export default function Messages() {
   });
 
   const deleteMessageMutation = useMutation({
-    mutationFn: (id) => base44.entities.Message.delete(id),
+    mutationFn: (id) => Message.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['messages']);
     },

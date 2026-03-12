@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getCurrentUserProfile } from '@/api/base44Client';
+import { getCurrentUserProfile } from '@/api/client';
 import { Category, Message, ServiceListing } from '@/api/entities';
 import { getLocationFromIP, getServiceProviders, searchGooglePlaces as searchGooglePlacesFunction, sendSMSVerification, verifySMSCode } from '@/api/functions';
 import { useQuery } from '@tanstack/react-query';

@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { base44, getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin } from '@/api/client';
+import { Booking, Category, Deal, Message, Offer, Property, ServiceListing } from '@/api/entities';
+import { getLocationFromIP } from '@/api/functions';
+import { SendEmail } from '@/api/integrations';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -152,7 +155,7 @@ export default function Deals() {
       if (locationFilter || locationLoadedFromIP) return;
       
       try {
-        const response = await base44.functions.invoke('getLocationFromIP');
+        const response = await getLocationFromIP();
         if (response.data.success && response.data.city) {
           setLocationFilter(response.data.city);
         }
@@ -167,7 +170,7 @@ export default function Deals() {
 
   const { data: deals, isLoading } = useQuery({
     queryKey: ['deals'],
-    queryFn: () => base44.entities.Deal.filter({ status: 'active' }, '-created_date'),
+    queryFn: () => Deal.filter({ status: 'active' }, '-created_date'),
     initialData: []
   });
 
@@ -206,26 +209,26 @@ export default function Deals() {
 
   const { data: dealCategories } = useQuery({
     queryKey: ['dealCategories'],
-    queryFn: () => base44.entities.Category.filter({ type: 'deal_type', is_active: true }),
+    queryFn: () => Category.filter({ type: 'deal_type', is_active: true }),
     initialData: []
   });
 
   const { data: serviceCategories } = useQuery({
     queryKey: ['serviceCategories'],
-    queryFn: () => base44.entities.Category.filter({ type: 'service_type', is_active: true }),
+    queryFn: () => Category.filter({ type: 'service_type', is_active: true }),
     initialData: []
   });
 
   const { data: userProperties } = useQuery({
     queryKey: ['userProperties', user?.email],
-    queryFn: () => user ? base44.entities.Property.filter({ user_email: user.email }) : [],
+    queryFn: () => user ? Property.filter({ user_email: user.email }) : [],
     enabled: !!user,
     initialData: []
   });
 
   const { data: userServices } = useQuery({
     queryKey: ['userServices', user?.email],
-    queryFn: () => user ? base44.entities.ServiceListing.filter({ expert_email: user.email }) : [],
+    queryFn: () => user ? ServiceListing.filter({ expert_email: user.email }) : [],
     enabled: !!user,
     initialData: []
   });
@@ -233,7 +236,7 @@ export default function Deals() {
   const canPostDeals = user && (userProperties.length > 0 || userServices.length > 0);
 
   const createDealMutation = useMutation({
-    mutationFn: (data) => base44.entities.Deal.create(data),
+    mutationFn: (data) => Deal.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries(['deals']);
       setShowForm(false);
@@ -242,7 +245,7 @@ export default function Deals() {
   });
 
   const updateDealMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Deal.update(id, data),
+    mutationFn: ({ id, data }) => Deal.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['deals']);
       setShowForm(false);
@@ -251,7 +254,7 @@ export default function Deals() {
   });
 
   const createBookingMutation = useMutation({
-    mutationFn: (data) => base44.entities.Booking.create(data),
+    mutationFn: (data) => Booking.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries(['bookings']);
       setBookingSuccess(true);
@@ -276,7 +279,7 @@ export default function Deals() {
     mutationFn: async (offerData) => {
       setSubmittingOffer(true);
       try {
-        const offer = await base44.entities.Offer.create(offerData);
+        const offer = await Offer.create(offerData);
         
         const emailSubject = `New Purchase Offer - ${selectedDeal.location}`;
         const emailBody = `You have received a new purchase offer for your property!
@@ -296,13 +299,13 @@ OFFER DETAILS:
 Review and respond to this offer in your dashboard:
 ${window.location.origin}/dashboard`;
 
-        await base44.integrations.Core.SendEmail({
+        await SendEmail({
           to: selectedDeal.user_email,
           subject: emailSubject,
           body: emailBody
         });
         
-        await base44.entities.Message.create({
+        await Message.create({
           sender_email: user.email,
           sender_name: offerData.buyer_name,
           recipient_email: selectedDeal.user_email,
@@ -400,7 +403,7 @@ ${window.location.origin}/dashboard`;
     };
 
     try {
-      const newBooking = await base44.entities.Booking.create(bookingPayload);
+      const newBooking = await Booking.create(bookingPayload);
       
       const bookingRequestUrl = `${window.location.origin}/messages`;
       const messageSubject = `New Service Deal Booking: ${deal.title}`;
@@ -425,7 +428,7 @@ ${window.location.origin}/dashboard`;
       messageBody += `Review and respond:\n${bookingRequestUrl}\n`;
       
       try {
-        await base44.entities.Message.create({
+        await Message.create({
           sender_email: user.email,
           sender_name: bookingData.renter_name || user.full_name,
           recipient_email: deal.user_email,
@@ -442,7 +445,7 @@ ${window.location.origin}/dashboard`;
       }
       
       try {
-        await base44.integrations.Core.SendEmail({
+        await SendEmail({
           to: deal.user_email,
           subject: messageSubject,
           body: messageBody

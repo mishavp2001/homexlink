@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getCurrentUserProfile, updateCurrentUserProfile } from '@/api/base44Client';
+import { getCurrentUserProfile, updateCurrentUserProfile } from '@/api/client';
 import { Category, ProviderSettings } from '@/api/entities';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';

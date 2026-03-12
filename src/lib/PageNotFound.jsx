@@ -1,5 +1,5 @@
 import { useLocation } from 'react-router-dom';
-import { getCurrentUserProfile } from '@/api/base44Client';
+import { getCurrentUserProfile } from '@/api/client';
 import { useQuery } from '@tanstack/react-query';
 
 

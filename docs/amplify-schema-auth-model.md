@@ -1,6 +1,6 @@
 ## Amplify Gen 2 schema and auth proposal
 
-This proposal is the target architecture for migrating the current Base44 app to Amplify Gen 2.
+This proposal is the target architecture for migrating the current legacy app to Amplify Gen 2.
 
 ### Core decisions
 
@@ -32,16 +32,14 @@ This proposal is the target architecture for migrating the current Base44 app to
 
 ### Function-first flows
 
-These current Base44 flows should stay server-driven in Amplify instead of direct client model mutation:
+These current legacy flows should stay server-driven in Amplify instead of direct client model mutation:
 
 1. `createPendingUser` / guest lead capture
 2. `completePendingUserConversion` after sign-in
 3. `searchGooglePlaces`
 4. `sendSMSVerification`
 5. `verifySMSCode`
-6. `verifyEmailCode`
-7. `stripeWebhook`
-8. email/SMS sending and credit/billing side effects
+6. email/SMS sending and credit/billing side effects
 
 Reason: these flows need validation, third-party secrets, anti-abuse controls, and cross-model writes.
 

@@ -1,5 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { base44, getCurrentUserProfile, redirectToAppLogin, updateCurrentUserProfile } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin, updateCurrentUserProfile } from '@/api/client';
+import {
+  Booking,
+  Deal,
+  Insight,
+  MaintenanceTask,
+  Message,
+  Offer,
+  PendingUser,
+  Property,
+  Report,
+  SavedDeal,
+  ServiceListing,
+} from '@/api/entities';
+import { sendEmail } from '@/api/functions';
+import { InvokeLLM } from '@/api/integrations';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -35,7 +50,7 @@ export default function Dashboard() {
         
         // Check for pending user data and auto-convert to Property/MaintenanceTask
         try {
-          const pendingUsers = await base44.entities.PendingUser.filter({ 
+          const pendingUsers = await PendingUser.filter({ 
             email: currentUser.email.toLowerCase().trim(), 
             status: 'pending' 
           });
@@ -44,7 +59,7 @@ export default function Dashboard() {
             const pendingUser = pendingUsers[0];
 
             // Update pending user with linked email
-            await base44.entities.PendingUser.update(pendingUser.id, {
+            await PendingUser.update(pendingUser.id, {
               linked_user_email: currentUser.email,
               status: 'linked'
             });
@@ -61,7 +76,7 @@ export default function Dashboard() {
               });
 
               // Check if ServiceListing already exists
-              const existingListings = await base44.entities.ServiceListing.filter({
+              const existingListings = await ServiceListing.filter({
                 expert_email: currentUser.email
               });
 
@@ -76,17 +91,17 @@ export default function Dashboard() {
 
               if (existingListings.length > 0) {
                 // Update existing ServiceListing
-                await base44.entities.ServiceListing.update(existingListings[0].id, listingData);
+                await ServiceListing.update(existingListings[0].id, listingData);
               } else {
                 // Create new ServiceListing
-                await base44.entities.ServiceListing.create({
+                await ServiceListing.create({
                   expert_email: currentUser.email,
                   ...listingData
                 });
               }
 
               // Delete pending user record
-              await base44.entities.PendingUser.delete(pendingUser.id);
+              await PendingUser.delete(pendingUser.id);
 
               // Reload to show service provider dashboard
               window.location.reload();
@@ -95,7 +110,7 @@ export default function Dashboard() {
               await updateCurrentUserProfile({ user_type: 'homeowner' });
               
               // Create property
-              const property = await base44.entities.Property.create({
+              const property = await Property.create({
                 address: pendingUser.project.address,
                 user_email: currentUser.email,
                 user_phone: pendingUser.phone || '',
@@ -103,7 +118,7 @@ export default function Dashboard() {
               });
 
               // Create maintenance task
-              await base44.entities.MaintenanceTask.create({
+              await MaintenanceTask.create({
                 property_id: property.id,
                 project_title: pendingUser.project.project_title,
                 project_description: pendingUser.project.project_description,
@@ -117,7 +132,7 @@ export default function Dashboard() {
               });
 
               // Delete pending user record
-              await base44.entities.PendingUser.delete(pendingUser.id);
+              await PendingUser.delete(pendingUser.id);
               
               // Reload to show properties tab
               window.location.reload();
@@ -144,7 +159,7 @@ export default function Dashboard() {
         // Fetch ServiceListing for service providers
         if (currentUser.user_type === 'service_provider') {
           try {
-            const listings = await base44.entities.ServiceListing.filter({
+            const listings = await ServiceListing.filter({
               expert_email: currentUser.email
             });
             if (listings.length > 0) {
@@ -166,7 +181,7 @@ export default function Dashboard() {
 
   const { data: properties, isLoading: loadingProperties } = useQuery({
     queryKey: ['properties', user?.email],
-    queryFn: () => user ? base44.entities.Property.filter({ user_email: user.email }, '-created_date') : [],
+    queryFn: () => user ? Property.filter({ user_email: user.email }, '-created_date') : [],
     enabled: !!user,
     initialData: []
   });
@@ -175,7 +190,7 @@ export default function Dashboard() {
     queryKey: ['maintenanceTasks', user?.email],
     queryFn: async () => {
       if (!user) return [];
-      const tasks = await base44.entities.MaintenanceTask.list();
+      const tasks = await MaintenanceTask.list();
       return tasks.filter(t => properties.some(p => p.id === t.property_id));
     },
     enabled: !!user && properties.length > 0,
@@ -186,7 +201,7 @@ export default function Dashboard() {
     queryKey: ['reports', properties],
     queryFn: async () => {
       if (!properties || properties.length === 0) return [];
-      const reports = await base44.entities.Report.list();
+      const reports = await Report.list();
       return reports;
     },
     enabled: !!properties && properties.length > 0,
@@ -197,49 +212,49 @@ export default function Dashboard() {
 
   const { data: myDeals, isLoading: loadingDeals } = useQuery({
     queryKey: ['myDeals', user?.email],
-    queryFn: () => user ? base44.entities.Deal.filter({ user_email: user.email }, '-created_date') : [],
+    queryFn: () => user ? Deal.filter({ user_email: user.email }, '-created_date') : [],
     enabled: !!user,
     initialData: []
   });
 
   const { data: receivedBookings, isLoading: loadingReceivedBookings } = useQuery({
     queryKey: ['receivedBookings', user?.email],
-    queryFn: () => user ? base44.entities.Booking.filter({ owner_email: user.email }, '-created_date') : [],
+    queryFn: () => user ? Booking.filter({ owner_email: user.email }, '-created_date') : [],
     enabled: !!user,
     initialData: []
   });
 
   const { data: sentBookings, isLoading: loadingSentBookings } = useQuery({
     queryKey: ['sentBookings', user?.email],
-    queryFn: () => user ? base44.entities.Booking.filter({ renter_email: user.email }, '-created_date') : [],
+    queryFn: () => user ? Booking.filter({ renter_email: user.email }, '-created_date') : [],
     enabled: !!user,
     initialData: []
   });
 
   const { data: savedDeals, isLoading: loadingSavedDeals } = useQuery({
     queryKey: ['savedDeals', user?.email],
-    queryFn: () => user ? base44.entities.SavedDeal.filter({ user_email: user.email }, '-created_date') : [],
+    queryFn: () => user ? SavedDeal.filter({ user_email: user.email }, '-created_date') : [],
     enabled: !!user,
     initialData: []
   });
 
   const { data: myInsights, isLoading: loadingInsights } = useQuery({
     queryKey: ['myInsights', user?.email],
-    queryFn: () => user ? base44.entities.Insight.filter({ created_by: user.email }, '-created_date') : [],
+    queryFn: () => user ? Insight.filter({ created_by: user.email }, '-created_date') : [],
     enabled: !!user,
     initialData: []
   });
 
   const { data: sentOffers, isLoading: loadingSentOffers } = useQuery({
     queryKey: ['sentOffers', user?.email],
-    queryFn: () => user ? base44.entities.Offer.filter({ buyer_email: user.email }, '-created_date') : [],
+    queryFn: () => user ? Offer.filter({ buyer_email: user.email }, '-created_date') : [],
     enabled: !!user,
     initialData: []
   });
 
   const { data: receivedOffers, isLoading: loadingReceivedOffers } = useQuery({
     queryKey: ['receivedOffers', user?.email],
-    queryFn: () => user ? base44.entities.Offer.filter({ seller_email: user.email }, '-created_date') : [],
+    queryFn: () => user ? Offer.filter({ seller_email: user.email }, '-created_date') : [],
     enabled: !!user,
     initialData: []
   });
@@ -270,7 +285,7 @@ Provide comprehensive recommendations including:
 
 Format your response as structured JSON with these sections.`;
 
-      const response = await base44.integrations.Core.InvokeLLM({
+      const response = await InvokeLLM({
         prompt,
         response_json_schema: {
           type: "object",
@@ -285,7 +300,7 @@ Format your response as structured JSON with these sections.`;
         }
       });
 
-      await base44.entities.MaintenanceTask.update(taskId, {
+      await MaintenanceTask.update(taskId, {
         ai_recommendations: response,
         recommendations_generated_date: new Date().toISOString()
       });
@@ -333,7 +348,7 @@ Provide detailed analysis including:
 
 Format as structured JSON.`;
 
-      const response = await base44.integrations.Core.InvokeLLM({
+      const response = await InvokeLLM({
         prompt,
         add_context_from_internet: true,
         response_json_schema: {
@@ -395,7 +410,7 @@ Format as structured JSON.`;
         }
       });
 
-      await base44.entities.Property.update(property.id, {
+      await Property.update(property.id, {
         ai_insights: response
       });
 
@@ -410,7 +425,7 @@ Format as structured JSON.`;
   };
 
   const updateBookingMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Booking.update(id, data),
+    mutationFn: ({ id, data }) => Booking.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['receivedBookings']);
       queryClient.invalidateQueries(['sentBookings']);
@@ -418,42 +433,42 @@ Format as structured JSON.`;
   });
 
   const deleteSavedDealMutation = useMutation({
-    mutationFn: (id) => base44.entities.SavedDeal.delete(id),
+    mutationFn: (id) => SavedDeal.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['savedDeals']);
     }
   });
 
   const deleteDealMutation = useMutation({
-    mutationFn: (id) => base44.entities.Deal.delete(id),
+    mutationFn: (id) => Deal.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['myDeals']);
     }
   });
 
   const deleteInsightMutation = useMutation({
-    mutationFn: (id) => base44.entities.Insight.delete(id),
+    mutationFn: (id) => Insight.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['myInsights']);
     }
   });
 
   const deletePropertyMutation = useMutation({
-    mutationFn: (id) => base44.entities.Property.delete(id),
+    mutationFn: (id) => Property.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['properties']);
     }
   });
 
   const deleteMaintenanceTaskMutation = useMutation({
-    mutationFn: (id) => base44.entities.MaintenanceTask.delete(id),
+    mutationFn: (id) => MaintenanceTask.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['maintenanceTasks']);
     }
   });
 
   const deleteBookingMutation = useMutation({
-    mutationFn: (id) => base44.entities.Booking.delete(id),
+    mutationFn: (id) => Booking.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['receivedBookings']);
       queryClient.invalidateQueries(['sentBookings']);
@@ -461,7 +476,7 @@ Format as structured JSON.`;
   });
 
   const deleteOfferMutation = useMutation({
-    mutationFn: (id) => base44.entities.Offer.delete(id),
+    mutationFn: (id) => Offer.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['receivedOffers']);
       queryClient.invalidateQueries(['sentOffers']);
@@ -469,7 +484,7 @@ Format as structured JSON.`;
   });
 
   const updateOfferMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Offer.update(id, data),
+    mutationFn: ({ id, data }) => Offer.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['receivedOffers']);
       queryClient.invalidateQueries(['sentOffers']);
@@ -487,7 +502,7 @@ Format as structured JSON.`;
     });
 
     if (status === 'confirmed' || status === 'rejected') {
-      base44.functions.invoke('sendEmail', {
+      sendEmail({
         to: booking.renter_email,
         subject: `Booking Request ${status === 'confirmed' ? 'Confirmed' : 'Declined'} - ${booking.property_address}`,
         html: `
@@ -540,7 +555,7 @@ Format as structured JSON.`;
 
     if (status === 'accepted' || status === 'rejected') {
       try {
-        await base44.entities.Message.create({
+        await Message.create({
           sender_email: user.email,
           sender_name: user.full_name || user.email,
           recipient_email: offer.buyer_email,
@@ -553,7 +568,7 @@ Format as structured JSON.`;
           is_read: false
         });
 
-        await base44.functions.invoke('sendEmail', {
+        await sendEmail({
           to: offer.buyer_email,
           subject: `Offer ${status === 'accepted' ? 'Accepted' : 'Rejected'} - ${offer.property_address}`,
           html: `

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AuthProvider } from '@/components/lib/AuthContext';
 import { TranslationProvider } from '@/components/lib/TranslationContext';
-import { getCurrentUserProfile } from '@/api/base44Client';
+import { getCurrentUserProfile } from '@/api/client';
 import { PageMetadata } from '@/api/entities';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';

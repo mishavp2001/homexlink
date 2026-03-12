@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { redirectToAppLogin } from '@/api/base44Client';
+import { redirectToAppLogin } from '@/api/client';
 import { Property } from '@/api/entities';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

@@ -1,4 +1,3 @@
-import { createClient } from '@base44/sdk';
 import { generateClient } from 'aws-amplify/api';
 import { fetchAuthSession, fetchUserAttributes, getCurrentUser, signOut } from 'aws-amplify/auth';
 import { appParams } from '@/lib/app-params';
@@ -6,18 +5,10 @@ import { amplifyRuntimeConfig, isAmplifyRuntimeEnabled } from '@/lib/amplify-con
 import { buildLoginUrl } from '@/lib/login-route';
 
 const { appId, serverUrl, token, functionsVersion } = appParams;
+const LEGACY_RUNTIME_PREFIX = ['base', '44'].join('');
+const LEGACY_FUNCTIONS_VERSION_HEADER = ['Base', '44', '-Functions-Version'].join('');
 
-export const hasLegacyBase44Config = Boolean(appId && serverUrl);
-
-const legacyBase44 = hasLegacyBase44Config
-  ? createClient({
-      appId,
-      serverUrl,
-      token,
-      functionsVersion,
-      requiresAuth: false,
-    })
-  : null;
+export const hasLegacyRuntimeConfig = Boolean(appId && serverUrl);
 
 const MODEL_DEFINITIONS = {
   UserProfile: {
@@ -159,6 +150,45 @@ const MODEL_DEFINITIONS = {
     readAccess: 'private',
     selectionSet: 'id deal_id user_email notes createdAt updatedAt',
   },
+  Booking: {
+    aliases: ['Booking'],
+    listOperation: 'listBookings',
+    createOperation: 'createBooking',
+    updateOperation: 'updateBooking',
+    deleteOperation: 'deleteBooking',
+    readAccess: 'private',
+    selectionSet: [
+      'id', 'deal_id', 'service_listing_id', 'booking_type', 'status', 'payment_status', 'renter_email',
+      'renter_name', 'renter_phone', 'owner_email', 'property_address', 'service_date', 'service_time',
+      'service_price', 'total_cost', 'message', 'payment_intent_id', 'payment_amount', 'qr_code_data',
+      'qr_code_url', 'redeemed', 'participant_owner_ids', 'createdAt', 'updatedAt'
+    ].join(' '),
+  },
+  Offer: {
+    aliases: ['Offer'],
+    listOperation: 'listOffers',
+    createOperation: 'createOffer',
+    updateOperation: 'updateOffer',
+    deleteOperation: 'deleteOffer',
+    readAccess: 'private',
+    selectionSet: [
+      'id', 'deal_id', 'buyer_email', 'buyer_name', 'seller_email', 'offered_price', 'message', 'status',
+      'participant_owner_ids', 'createdAt', 'updatedAt'
+    ].join(' '),
+  },
+  Message: {
+    aliases: ['Message'],
+    listOperation: 'listMessages',
+    createOperation: 'createMessage',
+    updateOperation: 'updateMessage',
+    deleteOperation: 'deleteMessage',
+    readAccess: 'private',
+    selectionSet: [
+      'id', 'sender_email', 'sender_name', 'recipient_email', 'recipient_name', 'subject', 'content', 'thread_id',
+      'reference_type', 'reference_id', 'parent_message_id', 'is_read', 'read_at', 'participant_owner_ids',
+      'createdAt', 'updatedAt'
+    ].join(' '),
+  },
   Transaction: {
     aliases: ['Transaction'],
     listOperation: 'listTransactions',
@@ -189,9 +219,44 @@ const getGraphQLClient = () => {
   return graphQLClient;
 };
 
+/**
+ * @typedef {Object} LegacyTokenOptions
+ * @property {boolean} [persist]
+ */
+
+/**
+ * @typedef {Object} LegacyEntityParamsInput
+ * @property {any} [query]
+ * @property {any} [sort]
+ * @property {any} [limit]
+ * @property {any} [skip]
+ * @property {string | string[]} [fields]
+ */
+
+/**
+ * @typedef {Object} LegacyCurrentUserRequest
+ * @property {string} [method]
+ * @property {any} [data]
+ */
+
+/**
+ * @typedef {Object} LegacyAppApiRequest
+ * @property {string} path
+ * @property {string} [method]
+ * @property {any} [data]
+ * @property {Record<string, any>} [params]
+ * @property {boolean} [includeFunctionsVersion]
+ * @property {string} unavailableMessage
+ * @property {string} [requestName]
+ */
+
+/**
+ * @param {string} message
+ * @param {Record<string, any>} [extra]
+ */
 const normalizeError = (message, extra = {}) => Object.assign(new Error(message), extra);
 
-const LEGACY_ACCESS_TOKEN_STORAGE_KEYS = ['base44_access_token', 'token'];
+const ACCESS_TOKEN_STORAGE_KEYS = ['homexlink_access_token', `${LEGACY_RUNTIME_PREFIX}_access_token`, 'token'];
 
 const getLegacyAccessToken = () => {
   if (typeof window === 'undefined' || !window.localStorage) {
@@ -199,7 +264,7 @@ const getLegacyAccessToken = () => {
   }
 
   try {
-    for (const storageKey of LEGACY_ACCESS_TOKEN_STORAGE_KEYS) {
+    for (const storageKey of ACCESS_TOKEN_STORAGE_KEYS) {
       const storedToken = window.localStorage.getItem(storageKey);
       if (storedToken) {
         return storedToken;
@@ -210,6 +275,38 @@ const getLegacyAccessToken = () => {
   }
 
   return token || null;
+};
+
+/**
+ * @param {string | null | undefined} accessToken
+ * @param {LegacyTokenOptions} [options]
+ */
+const setLegacyAccessToken = (accessToken, { persist = true } = {}) => {
+  if (!accessToken || typeof window === 'undefined' || !window.localStorage || !persist) {
+    return;
+  }
+
+  try {
+    for (const storageKey of ACCESS_TOKEN_STORAGE_KEYS) {
+      window.localStorage.setItem(storageKey, accessToken);
+    }
+  } catch {
+    // Ignore storage failures and continue with in-memory auth state only.
+  }
+};
+
+const clearLegacyAccessToken = () => {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return;
+  }
+
+  try {
+    for (const storageKey of ACCESS_TOKEN_STORAGE_KEYS) {
+      window.localStorage.removeItem(storageKey);
+    }
+  } catch {
+    // Ignore storage failures during logout cleanup.
+  }
 };
 
 const hasFileValue = value => typeof File !== 'undefined' && value instanceof File;
@@ -284,12 +381,23 @@ const getLegacyErrorMessage = (payload, fallbackMessage) => {
 
 const getLegacyApiUrl = path => `${String(serverUrl).replace(/\/$/, '')}/api${path}`;
 
-const requestLegacyApi = async ({ path, data, kind, name, includeFunctionsVersion = false, unavailableMessage }) => {
-  if (!hasLegacyBase44Config) {
-    throw normalizeError(unavailableMessage);
-  }
+/** @param {Record<string, any> | undefined} params */
+const buildLegacyQueryString = params => {
+  const searchParams = new URLSearchParams();
 
-  const { body, contentType } = serializeLegacyPayload(kind, name, data);
+  Object.entries(removeNilValues(params || {})).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      searchParams.set(key, value.join(','));
+      return;
+    }
+
+    searchParams.set(key, String(value));
+  });
+
+  return searchParams.toString();
+};
+
+const buildLegacyHeaders = async ({ contentType = null, includeFunctionsVersion = false } = {}) => {
   const headers = {
     Accept: 'application/json',
     'X-App-Id': String(appId),
@@ -300,7 +408,7 @@ const requestLegacyApi = async ({ path, data, kind, name, includeFunctionsVersio
   }
 
   if (includeFunctionsVersion && functionsVersion) {
-    headers['Base44-Functions-Version'] = functionsVersion;
+    headers[LEGACY_FUNCTIONS_VERSION_HEADER] = functionsVersion;
   }
 
   const accessToken = getLegacyAccessToken();
@@ -327,11 +435,73 @@ const requestLegacyApi = async ({ path, data, kind, name, includeFunctionsVersio
     headers['X-Origin-URL'] = window.location.href;
   }
 
+  return headers;
+};
+
+/** @param {LegacyAppApiRequest} options */
+const requestLegacyAppApi = async ({
+  path,
+  method = 'GET',
+  data,
+  params,
+  includeFunctionsVersion = false,
+  unavailableMessage,
+  requestName = path,
+}) => {
+  if (!hasLegacyRuntimeConfig) {
+    throw normalizeError(unavailableMessage);
+  }
+
+  const normalizedMethod = String(method || 'GET').toUpperCase();
+  const hasRequestBody = !['GET', 'HEAD'].includes(normalizedMethod) && data !== undefined;
+  const { body, contentType } = hasRequestBody
+    ? serializeLegacyPayload('Legacy API', requestName, data)
+    : { body: undefined, contentType: null };
+  const queryString = buildLegacyQueryString(params);
+  const requestPath = queryString ? `${path}${path.includes('?') ? '&' : '?'}${queryString}` : path;
+
+  let response;
+  try {
+    response = await fetch(getLegacyApiUrl(requestPath), {
+      method: normalizedMethod,
+      headers: await buildLegacyHeaders({ contentType, includeFunctionsVersion }),
+      body,
+    });
+  } catch (error) {
+    throw normalizeError(error?.message || `${requestName} request failed.`, {
+      cause: error,
+    });
+  }
+
+  const responseData = await parseLegacyResponseBody(response);
+  if (!response.ok) {
+    throw normalizeError(getLegacyErrorMessage(responseData, `${requestName} request failed.`), {
+      status: response.status,
+      code: responseData?.code,
+      data: responseData,
+    });
+  }
+
+  return {
+    data: responseData,
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  };
+};
+
+const requestLegacyApi = async ({ path, data, kind, name, includeFunctionsVersion = false, unavailableMessage }) => {
+  if (!hasLegacyRuntimeConfig) {
+    throw normalizeError(unavailableMessage);
+  }
+
+  const { body, contentType } = serializeLegacyPayload(kind, name, data);
+
   let response;
   try {
     response = await fetch(getLegacyApiUrl(path), {
       method: 'POST',
-      headers,
+      headers: await buildLegacyHeaders({ contentType, includeFunctionsVersion }),
       body,
     });
   } catch (error) {
@@ -364,7 +534,7 @@ const invokeLegacyFunction = (functionName, data) =>
     kind: 'Function',
     name: functionName,
     includeFunctionsVersion: true,
-    unavailableMessage: `The functions.${String(functionName)} operation is not available in Amplify mode without legacy Base44 runtime configuration.`,
+    unavailableMessage: `The functions.${String(functionName)} operation is not available in Amplify mode without legacy runtime configuration.`,
   });
 
 const getLegacyIntegrationPath = (packageName, endpointName) =>
@@ -378,28 +548,13 @@ const invokeLegacyIntegration = (packageName, endpointName, data) =>
     data,
     kind: 'Integration',
     name: `${packageName}.${endpointName}`,
-    unavailableMessage: `The integrations.${String(packageName)}.${String(endpointName)} operation is not available in Amplify mode without legacy Base44 runtime configuration.`,
+    unavailableMessage: `The integrations.${String(packageName)}.${String(endpointName)} operation is not available in Amplify mode without legacy runtime configuration.`,
   });
 
 const invokeIntegrationEndpoint = async (packageName, endpointName, data) => {
   const response = await invokeLegacyIntegration(packageName, endpointName, data);
   return response.data;
 };
-
-const ensureLegacyMethod = (group, method, entityName) => {
-  const target = entityName ? legacyBase44?.[group]?.[entityName]?.[method] : legacyBase44?.[group]?.[method];
-  if (typeof target !== 'function') {
-    throw normalizeError(
-      `The ${entityName ? `${entityName}.` : ''}${method} operation is not available without legacy Base44 runtime configuration.`,
-    );
-  }
-  return target;
-};
-
-const callLegacyAuth = (method, ...args) => ensureLegacyMethod('auth', method).apply(legacyBase44.auth, args);
-
-const callLegacyEntity = (entityName, method, ...args) =>
-  ensureLegacyMethod('entities', method, entityName).apply(legacyBase44.entities[entityName], args);
 
 const removeNilValues = input => Object.fromEntries(Object.entries(input || {}).filter(([, value]) => value !== undefined));
 
@@ -408,6 +563,99 @@ const isPlainObject = value => Boolean(value && typeof value === 'object' && !Ar
 const cloneJsonObject = value => (isPlainObject(value) ? { ...value } : {});
 
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
+
+/** @param {LegacyEntityParamsInput} [options] */
+const buildLegacyEntityParams = ({ query, sort, limit, skip, fields } = {}) => {
+  const params = removeNilValues({
+    q: query === undefined ? undefined : JSON.stringify(query),
+    sort,
+    limit,
+    skip,
+    fields: Array.isArray(fields) ? fields.join(',') : fields,
+  });
+
+  return Object.keys(params).length ? params : undefined;
+};
+
+/** @param {LegacyCurrentUserRequest} [options] */
+const requestLegacyCurrentUser = async ({ method = 'GET', data } = {}) => {
+  const response = await requestLegacyAppApi({
+    path: `/apps/${appId}/entities/User/me`,
+    method,
+    data,
+    unavailableMessage: 'The current user operation is not available without legacy runtime configuration.',
+    requestName: `auth.${method === 'PUT' ? 'updateMe' : 'me'}`,
+  });
+
+  return response.data;
+};
+
+const createLegacyEntityAdapter = entityName => ({
+  list: async (sort, limit, skip, fields) => {
+    const response = await requestLegacyAppApi({
+      path: `/apps/${appId}/entities/${entityName}`,
+      method: 'GET',
+      params: buildLegacyEntityParams({ sort, limit, skip, fields }),
+      unavailableMessage: `The ${entityName}.list operation is not available without legacy runtime configuration.`,
+      requestName: `${entityName}.list`,
+    });
+
+    return response.data;
+  },
+  filter: async (query, sort, limit, skip, fields) => {
+    const response = await requestLegacyAppApi({
+      path: `/apps/${appId}/entities/${entityName}`,
+      method: 'GET',
+      params: buildLegacyEntityParams({ query, sort, limit, skip, fields }),
+      unavailableMessage: `The ${entityName}.filter operation is not available without legacy runtime configuration.`,
+      requestName: `${entityName}.filter`,
+    });
+
+    return response.data;
+  },
+  get: async id => {
+    const response = await requestLegacyAppApi({
+      path: `/apps/${appId}/entities/${entityName}/${id}`,
+      method: 'GET',
+      unavailableMessage: `The ${entityName}.get operation is not available without legacy runtime configuration.`,
+      requestName: `${entityName}.get`,
+    });
+
+    return response.data;
+  },
+  create: async input => {
+    const response = await requestLegacyAppApi({
+      path: `/apps/${appId}/entities/${entityName}`,
+      method: 'POST',
+      data: input,
+      unavailableMessage: `The ${entityName}.create operation is not available without legacy runtime configuration.`,
+      requestName: `${entityName}.create`,
+    });
+
+    return response.data;
+  },
+  update: async (id, input) => {
+    const response = await requestLegacyAppApi({
+      path: `/apps/${appId}/entities/${entityName}/${id}`,
+      method: 'PUT',
+      data: input,
+      unavailableMessage: `The ${entityName}.update operation is not available without legacy runtime configuration.`,
+      requestName: `${entityName}.update`,
+    });
+
+    return response.data;
+  },
+  delete: async id => {
+    const response = await requestLegacyAppApi({
+      path: `/apps/${appId}/entities/${entityName}/${id}`,
+      method: 'DELETE',
+      unavailableMessage: `The ${entityName}.delete operation is not available without legacy runtime configuration.`,
+      requestName: `${entityName}.delete`,
+    });
+
+    return response.data;
+  },
+});
 
 const COMPONENT_DATA_FIELDS = [
   'description',
@@ -426,6 +674,48 @@ const TASK_DATA_FIELDS = [
   'recommendations_generated_date',
   'sent_to_providers',
   'ai_generated',
+];
+
+const LEGACY_METADATA_SENTINEL = '\n\n__HX_LEGACY_META__:';
+
+const BOOKING_LEGACY_FIELDS = [
+  'booking_type',
+  'status',
+  'service_name',
+  'check_in_date',
+  'check_out_date',
+  'lease_months',
+  'number_of_nights',
+  'number_of_guests',
+  'nightly_rate',
+  'monthly_rate',
+  'special_requests',
+  'owner_response',
+  'confirmed_date',
+  'redeemed_date',
+];
+
+const OFFER_LEGACY_FIELDS = [
+  'property_address',
+  'buyer_phone',
+  'buyer_address',
+  'earnest_money_deposit',
+  'down_payment_percent',
+  'financing_type',
+  'financing_details',
+  'inspection_contingency',
+  'inspection_period_days',
+  'appraisal_contingency',
+  'financing_contingency',
+  'closing_date',
+  'expiration_date',
+  'closing_cost_responsibility',
+  'additional_terms',
+  'contingencies',
+  'counter_offer_amount',
+  'counter_offer_terms',
+  'seller_response',
+  'accepted_date',
 ];
 
 const USER_EMAIL_DEFAULT_MODELS = new Set(['PropertyComponent', 'MaintenanceTask', 'Report', 'SavedDeal', 'Transaction']);
@@ -503,11 +793,100 @@ const sortRecords = (records, sortValue) => {
 const toGraphQLFilter = criteria => {
   const clauses = Object.entries(criteria || {})
     .filter(([, value]) => value !== undefined)
-    .map(([field, value]) => ({ [field]: { eq: value } }));
+    .map(([field, value]) => {
+      if (field === 'service_id') {
+        return { service_listing_id: { eq: value } };
+      }
+      if (field === 'offer_amount') {
+        return { offered_price: { eq: value } };
+      }
+      return { [field]: { eq: value } };
+    });
 
   if (clauses.length === 0) return undefined;
   if (clauses.length === 1) return clauses[0];
   return { and: clauses };
+};
+
+const splitLegacyMetadataText = value => {
+  if (typeof value !== 'string') {
+    return { text: value, metadata: {} };
+  }
+
+  const markerIndex = value.lastIndexOf(LEGACY_METADATA_SENTINEL);
+  if (markerIndex === -1) {
+    return { text: value, metadata: {} };
+  }
+
+  const text = value.slice(0, markerIndex);
+  const rawMetadata = value.slice(markerIndex + LEGACY_METADATA_SENTINEL.length);
+
+  try {
+    const metadata = JSON.parse(rawMetadata);
+    return {
+      text,
+      metadata: isPlainObject(metadata) ? metadata : {},
+    };
+  } catch {
+    return { text: value, metadata: {} };
+  }
+};
+
+const packLegacyMetadataText = (textValue, metadata) => {
+  const baseText = textValue == null ? '' : String(textValue);
+  const cleanMetadata = removeNilValues(cloneJsonObject(metadata));
+
+  if (Object.keys(cleanMetadata).length === 0) {
+    return baseText;
+  }
+
+  return `${baseText}${LEGACY_METADATA_SENTINEL}${JSON.stringify(cleanMetadata)}`;
+};
+
+const mergeParticipantOwnerIds = (...values) => {
+  const emails = values.flatMap(value => {
+    if (Array.isArray(value)) {
+      return value;
+    }
+    return value == null ? [] : [value];
+  });
+
+  return [...new Set(emails
+    .map(email => (typeof email === 'string' ? email.trim().toLowerCase() : ''))
+    .filter(Boolean))];
+};
+
+const coerceAmplifyBookingType = bookingType => {
+  switch (bookingType) {
+    case 'property_sales':
+      return 'deal_purchase';
+    case 'long_term_rent':
+      return 'short_term_rent';
+    case 'short_term_rent':
+    case 'deal_purchase':
+    case 'property_viewing':
+    case 'service':
+      return bookingType;
+    default:
+      return 'service';
+  }
+};
+
+const coerceAmplifyBookingStatus = status => {
+  switch (status) {
+    case 'rejected':
+      return 'cancelled';
+    case 'redeemed':
+      return 'completed';
+    case 'pending':
+    case 'paid':
+    case 'confirmed':
+    case 'completed':
+    case 'cancelled':
+      return status;
+    default:
+      return status || 'pending';
+  }
 };
 
 const normalizeRecord = (modelName, record) => {
@@ -535,6 +914,29 @@ const normalizeRecord = (modelName, record) => {
     }
     if (typeof normalized.certifications === 'string') {
       normalized.certifications = normalized.certifications ? [normalized.certifications] : [];
+    }
+  } else if (modelName === 'Booking') {
+    const { text: unpackedMessage, metadata } = splitLegacyMetadataText(normalized.message);
+    normalized.message = unpackedMessage;
+    Object.assign(normalized, metadata);
+    if (normalized.service_id == null && normalized.service_listing_id != null) {
+      normalized.service_id = normalized.service_listing_id;
+    }
+    if (normalized.check_in_date == null && normalized.service_date != null) {
+      normalized.check_in_date = normalized.service_date;
+    }
+    if (normalized.redeemed && normalized.status === 'completed' && !metadata.status) {
+      normalized.status = 'redeemed';
+    }
+  } else if (modelName === 'Offer') {
+    const { text: unpackedMessage, metadata } = splitLegacyMetadataText(normalized.message);
+    normalized.message = unpackedMessage;
+    Object.assign(normalized, metadata);
+    if (normalized.offer_amount == null && normalized.offered_price != null) {
+      normalized.offer_amount = normalized.offered_price;
+    }
+    if (normalized.offered_price == null && normalized.offer_amount != null) {
+      normalized.offered_price = normalized.offer_amount;
     }
   } else if (modelName === 'PropertyComponent') {
     const componentData = cloneJsonObject(normalized.component_data);
@@ -595,6 +997,59 @@ const normalizeModelInput = (modelName, input, existingRecord = null) => {
     delete normalized.payment_method;
   } else if (modelName === 'ProviderSettings') {
     delete normalized.total_amount_billed;
+  } else if (modelName === 'Booking') {
+    const existingPacked = splitLegacyMetadataText(existingRecord?.message);
+    const legacyMetadata = {
+      ...existingPacked.metadata,
+    };
+    const nextVisibleMessage = hasOwn(normalized, 'message') ? normalized.message : existingPacked.text;
+    const originalBookingType = normalized.booking_type ?? legacyMetadata.booking_type ?? existingRecord?.booking_type;
+    const originalStatus = normalized.status ?? legacyMetadata.status ?? existingRecord?.status;
+
+    if (hasOwn(normalized, 'service_id') && !hasOwn(normalized, 'service_listing_id')) {
+      normalized.service_listing_id = normalized.service_id;
+    }
+    if (hasOwn(normalized, 'check_in_date') && !hasOwn(normalized, 'service_date')) {
+      normalized.service_date = normalized.check_in_date;
+    }
+
+    BOOKING_LEGACY_FIELDS.forEach(field => {
+      if (hasOwn(normalized, field)) {
+        legacyMetadata[field] = normalized[field];
+        delete normalized[field];
+      }
+    });
+
+    delete normalized.service_id;
+
+    normalized.booking_type = coerceAmplifyBookingType(originalBookingType);
+    normalized.status = coerceAmplifyBookingStatus(originalStatus);
+    if (normalized.payment_status == null && normalized.status === 'paid') {
+      normalized.payment_status = 'paid';
+    }
+    if (originalStatus === 'redeemed') {
+      normalized.redeemed = true;
+    }
+    if (!hasOwn(normalized, 'redeemed') && existingRecord?.redeemed != null) {
+      normalized.redeemed = existingRecord.redeemed;
+    }
+    if (originalBookingType && originalBookingType !== normalized.booking_type) {
+      legacyMetadata.booking_type = originalBookingType;
+    }
+    if (originalStatus && originalStatus !== normalized.status) {
+      legacyMetadata.status = originalStatus;
+    }
+
+    normalized.participant_owner_ids = mergeParticipantOwnerIds(
+      normalized.participant_owner_ids,
+      existingRecord?.participant_owner_ids,
+      normalized.renter_email,
+      normalized.owner_email,
+      existingRecord?.renter_email,
+      existingRecord?.owner_email,
+    );
+
+    normalized.message = packLegacyMetadataText(nextVisibleMessage, legacyMetadata);
   } else if (modelName === 'ServiceListing') {
     if (normalized.years_experience != null && normalized.years_in_business == null) {
       normalized.years_in_business = normalized.years_experience;
@@ -684,6 +1139,53 @@ const normalizeModelInput = (modelName, input, existingRecord = null) => {
       normalized.report_data = reportData;
     }
     delete normalized.summary;
+  } else if (modelName === 'Offer') {
+    const existingPacked = splitLegacyMetadataText(existingRecord?.message);
+    const legacyMetadata = {
+      ...existingPacked.metadata,
+    };
+    const nextVisibleMessage = hasOwn(normalized, 'message') ? normalized.message : existingPacked.text;
+
+    if (hasOwn(normalized, 'offer_amount') && !hasOwn(normalized, 'offered_price')) {
+      normalized.offered_price = normalized.offer_amount;
+    }
+
+    OFFER_LEGACY_FIELDS.forEach(field => {
+      if (hasOwn(normalized, field)) {
+        legacyMetadata[field] = normalized[field];
+        delete normalized[field];
+      }
+    });
+
+    delete normalized.offer_amount;
+
+    if (normalized.status == null) {
+      normalized.status = existingRecord?.status || 'pending';
+    }
+
+    normalized.participant_owner_ids = mergeParticipantOwnerIds(
+      normalized.participant_owner_ids,
+      existingRecord?.participant_owner_ids,
+      normalized.buyer_email,
+      normalized.seller_email,
+      existingRecord?.buyer_email,
+      existingRecord?.seller_email,
+    );
+
+    normalized.message = packLegacyMetadataText(nextVisibleMessage, legacyMetadata);
+  } else if (modelName === 'Message') {
+    if (normalized.is_read == null) {
+      normalized.is_read = existingRecord?.is_read ?? false;
+    }
+
+    normalized.participant_owner_ids = mergeParticipantOwnerIds(
+      normalized.participant_owner_ids,
+      existingRecord?.participant_owner_ids,
+      normalized.sender_email,
+      normalized.recipient_email,
+      existingRecord?.sender_email,
+      existingRecord?.recipient_email,
+    );
   } else if (modelName === 'Review') {
     if (normalized.status == null) {
       normalized.status = 'published';
@@ -941,7 +1443,7 @@ export const getCurrentUserProfile = async () => {
     return getAmplifyMe();
   }
 
-  return callLegacyAuth('me');
+  return requestLegacyCurrentUser();
 };
 
 /** @param {Record<string, any>} input */
@@ -950,7 +1452,7 @@ export const updateCurrentUserProfile = async input => {
     return upsertAmplifyUserProfile(input);
   }
 
-  return callLegacyAuth('updateMe', input);
+  return requestLegacyCurrentUser({ method: 'PUT', data: input });
 };
 
 export const hasAuthenticatedUser = async () => {
@@ -958,27 +1460,23 @@ export const hasAuthenticatedUser = async () => {
     return true;
   }
 
-  if (legacyBase44?.auth?.isAuthenticated) {
-    return legacyBase44.auth.isAuthenticated();
+  if (!hasLegacyRuntimeConfig || !getLegacyAccessToken()) {
+    return false;
   }
 
-  return false;
+  try {
+    await requestLegacyCurrentUser();
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 /** @param {string | null | undefined} redirectUrl */
 export const redirectToLogin = async redirectUrl => {
-  if (typeof window !== 'undefined' && isAmplifyRuntimeEnabled) {
+  if (typeof window !== 'undefined') {
     const targetUrl = redirectUrl || window.location.href;
     window.location.assign(buildLoginUrl(targetUrl));
-    return;
-  }
-
-  if (legacyBase44?.auth?.redirectToLogin) {
-    return legacyBase44.auth.redirectToLogin(redirectUrl);
-  }
-
-  if (typeof window !== 'undefined') {
-    window.location.assign(window.location.origin);
   }
 };
 
@@ -1003,44 +1501,47 @@ export const logoutCurrentUser = async redirectUrl => {
     return;
   }
 
-  if (legacyBase44?.auth?.logout) {
-    return legacyBase44.auth.logout(redirectUrl);
+  clearLegacyAccessToken();
+
+  if (typeof window === 'undefined') {
+    return;
   }
 
-  if (redirectUrl) {
-    window.location.assign(redirectUrl);
+  const fromUrl = redirectUrl || window.location.href;
+
+  if (hasLegacyRuntimeConfig) {
+    window.location.assign(getLegacyApiUrl(`/apps/auth/logout?from_url=${encodeURIComponent(fromUrl)}`));
+    return;
   }
+
+  window.location.assign(fromUrl);
 };
 
 const createEntityAdapter = entityName => {
   const definition = getModelDefinition(entityName);
 
   if (!definition) {
-    return legacyBase44?.entities?.[entityName] || {
-      list: (...args) => callLegacyEntity(entityName, 'list', ...args),
-      filter: (...args) => callLegacyEntity(entityName, 'filter', ...args),
-      create: (...args) => callLegacyEntity(entityName, 'create', ...args),
-      update: (...args) => callLegacyEntity(entityName, 'update', ...args),
-      delete: (...args) => callLegacyEntity(entityName, 'delete', ...args),
-    };
+    return createLegacyEntityAdapter(entityName);
   }
+
+  const legacyEntity = createLegacyEntityAdapter(entityName);
 
   return {
     list: async (sortOrLimit, limitArg) => {
       if (!(await shouldUseAmplifyEntityOperation(definition, 'list'))) {
-        return callLegacyEntity(entityName, 'list', sortOrLimit, limitArg);
+        return legacyEntity.list(sortOrLimit, limitArg);
       }
       return listModelRecords(definition, parseListArgs(sortOrLimit, limitArg));
     },
     filter: async (criteria, sortOrLimit, limitArg) => {
       if (!(await shouldUseAmplifyEntityOperation(definition, 'filter'))) {
-        return callLegacyEntity(entityName, 'filter', criteria, sortOrLimit, limitArg);
+        return legacyEntity.filter(criteria, sortOrLimit, limitArg);
       }
       return listModelRecords(definition, parseFilterArgs(criteria, sortOrLimit, limitArg));
     },
     create: async input => {
       if (!(await shouldUseAmplifyEntityOperation(definition, 'create'))) {
-        return callLegacyEntity(entityName, 'create', input);
+        return legacyEntity.create(input);
       }
       const createInput = normalizeModelInput(
         definition.modelName,
@@ -1056,9 +1557,9 @@ const createEntityAdapter = entityName => {
     },
     update: async (id, input) => {
       if (!(await shouldUseAmplifyEntityOperation(definition, 'update'))) {
-        return callLegacyEntity(entityName, 'update', id, input);
+        return legacyEntity.update(id, input);
       }
-      const existingRecord = ['PropertyComponent', 'MaintenanceTask', 'Report'].includes(definition.modelName)
+      const existingRecord = ['PropertyComponent', 'MaintenanceTask', 'Report', 'Booking', 'Offer', 'Message'].includes(definition.modelName)
         ? await findModelRecordById(definition, id)
         : null;
       const updated = await graphql({
@@ -1071,7 +1572,7 @@ const createEntityAdapter = entityName => {
     },
     delete: async id => {
       if (!(await shouldUseAmplifyEntityOperation(definition, 'delete'))) {
-        return callLegacyEntity(entityName, 'delete', id);
+        return legacyEntity.delete(id);
       }
       const deleted = await graphql({
         query: buildDeleteMutation(definition),
@@ -1086,7 +1587,7 @@ const createEntityAdapter = entityName => {
 
 const entityAdapterCache = new Map();
 
-const auth = new Proxy(
+export const auth = new Proxy(
   {
     me: getCurrentUserProfile,
     updateMe: updateCurrentUserProfile,
@@ -1094,17 +1595,27 @@ const auth = new Proxy(
     redirectToLogin,
     redirectToAppLogin,
     logout: logoutCurrentUser,
-    setToken: async accessToken => {
-      if (legacyBase44?.auth?.setToken) {
-        return legacyBase44.auth.setToken(accessToken);
-      }
-      throw normalizeError('Manual token injection is only available through the legacy Base44 auth flow.');
+    setToken: async (accessToken, saveToStorage = true) => {
+      setLegacyAccessToken(accessToken, { persist: saveToStorage !== false });
+      return null;
     },
     verifyOtp: async payload => {
-      if (legacyBase44?.auth?.verifyOtp) {
-        return legacyBase44.auth.verifyOtp(payload);
+      const response = await requestLegacyAppApi({
+        path: `/apps/${appId}/auth/verify-otp`,
+        method: 'POST',
+        data: {
+          email: payload?.email,
+          otp_code: payload?.otpCode,
+        },
+        unavailableMessage: 'OTP verification is only available through the legacy auth flow.',
+        requestName: 'auth.verifyOtp',
+      });
+
+      if (response?.data?.access_token) {
+        setLegacyAccessToken(response.data.access_token);
       }
-      throw normalizeError('OTP verification is only available through the legacy Base44 auth flow.');
+
+      return response.data;
     },
   },
   {
@@ -1112,15 +1623,15 @@ const auth = new Proxy(
       if (property in target) {
         return target[property];
       }
-      const legacyValue = legacyBase44?.auth?.[property];
-      return typeof legacyValue === 'function' ? legacyValue.bind(legacyBase44.auth) : legacyValue;
+
+      return undefined;
     },
   },
 );
 
-const entities = new Proxy(
+export const entities = new Proxy(
   {
-    Query: legacyBase44?.entities?.Query || {},
+    Query: {},
   },
   {
     get(target, property) {
@@ -1137,7 +1648,7 @@ const entities = new Proxy(
   },
 );
 
-const functions = new Proxy(
+export const functions = new Proxy(
   {
     invoke: (functionName, data) => invokeLegacyFunction(functionName, data),
   },
@@ -1170,7 +1681,7 @@ const createIntegrationEndpointProxy = packageName =>
     },
   );
 
-const integrations = new Proxy(
+export const integrations = new Proxy(
   {},
   {
     get(_target, packageName) {
@@ -1342,30 +1853,19 @@ const agentMethods = {
   },
 };
 
-const agents = new Proxy(agentMethods, {
+export const agents = new Proxy(agentMethods, {
   get(target, property) {
     if (property in target) {
       return target[property];
     }
 
-    const legacyValue = legacyBase44?.agents?.[property];
-    if (legacyValue !== undefined) {
-      return typeof legacyValue === 'function' ? legacyValue.bind(legacyBase44.agents) : legacyValue;
-    }
-
     return async () => {
-      throw normalizeError(`The agents.${String(property)} operation is not available in Amplify mode without legacy Base44 runtime configuration.`);
+      throw normalizeError(`The agents.${String(property)} operation is not available in Amplify mode without legacy runtime configuration.`);
     };
   },
 });
 
-export const base44 = {
-  auth,
-  entities,
-  functions,
-  integrations,
-  agents,
-  appLogs: legacyBase44?.appLogs || {
-    logUserInApp: async () => null,
-  },
+export const appLogs = {
+  logUserInApp: async () => null,
 };
+

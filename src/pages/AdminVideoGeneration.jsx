@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin } from '@/api/client';
 import { Deal } from '@/api/entities';
 import { generatePropertyVideo } from '@/api/functions';
 import { useQuery } from '@tanstack/react-query';

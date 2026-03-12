@@ -1,5 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { base44, getCurrentUserProfile } from '@/api/base44Client';
+import { getCurrentUserProfile } from '@/api/client';
+import {
+  Category,
+  LeadCharge,
+  MaintenanceTask,
+  Message,
+  Property,
+  PropertyComponent,
+  ProviderSettings,
+  ServiceListing,
+} from '@/api/entities';
+import { sendEmail } from '@/api/functions';
+import { UploadFile } from '@/api/integrations';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -108,7 +120,7 @@ export default function Maintenance() {
   const { data: property, isLoading: loadingProperty } = useQuery({
     queryKey: ['property', propertyId],
     queryFn: async () => {
-      const props = await base44.entities.Property.filter({ id: propertyId });
+      const props = await Property.filter({ id: propertyId });
       return props[0];
     },
     enabled: !!propertyId
@@ -116,28 +128,28 @@ export default function Maintenance() {
 
   const { data: components } = useQuery({
     queryKey: ['components', propertyId],
-    queryFn: () => base44.entities.PropertyComponent.filter({ property_id: propertyId }),
+    queryFn: () => PropertyComponent.filter({ property_id: propertyId }),
     enabled: !!propertyId,
     initialData: []
   });
 
   const { data: projects, isLoading } = useQuery({
     queryKey: ['projects', propertyId],
-    queryFn: () => base44.entities.MaintenanceTask.filter({ property_id: propertyId }, '-created_date'),
+    queryFn: () => MaintenanceTask.filter({ property_id: propertyId }, '-created_date'),
     enabled: !!propertyId,
     initialData: []
   });
 
   const { data: serviceProviders } = useQuery({
     queryKey: ['serviceProviders'],
-    queryFn: () => base44.entities.ServiceListing.filter({ status: 'active' }),
+    queryFn: () => ServiceListing.filter({ status: 'active' }),
     initialData: []
   });
 
   const { data: projectTypeCategories } = useQuery({
     queryKey: ['projectTypeCategories'],
     queryFn: async () => {
-      const categories = await base44.entities.Category.filter({ type: 'project_type', is_active: true });
+      const categories = await Category.filter({ type: 'project_type', is_active: true });
       return categories;
     },
     initialData: []
@@ -154,7 +166,7 @@ export default function Maintenance() {
     setUploadingPhotos(true);
     try {
       const uploadPromises = files.map(file =>
-        base44.integrations.Core.UploadFile({ file })
+        UploadFile({ file })
       );
       const results = await Promise.all(uploadPromises);
       const urls = results.map(r => r.file_url);
@@ -177,7 +189,7 @@ export default function Maintenance() {
       if (!propertyId) {
         throw new Error('Property ID is required');
       }
-      return base44.entities.MaintenanceTask.create({
+      return MaintenanceTask.create({
         ...projectData,
         property_id: propertyId
       });
@@ -228,7 +240,7 @@ export default function Maintenance() {
   });
 
   const updateProjectMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.MaintenanceTask.update(id, data),
+    mutationFn: ({ id, data }) => MaintenanceTask.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['projects']);
     }
@@ -454,7 +466,7 @@ This is an automated notification from HomeXrei.`;
 
           // Create message in database
           console.log(`Creating internal message...`);
-          await base44.entities.Message.create({
+          await Message.create({
             sender_email: user.email,
             sender_name: user.full_name || user.email,
             recipient_email: provider.expert_email,
@@ -484,14 +496,14 @@ This is an automated notification from HomeXrei.`;
           console.log(`   Payload:`, emailPayload);
           
           // Call Resend SendEmail
-          const emailResult = await base44.integrations.Resend.SendEmail(emailPayload);
+          const emailResult = await sendEmail(emailPayload);
           
-          console.log(`   Response:`, emailResult);
+          console.log(`   Response:`, emailResult?.data ?? emailResult);
           console.log(`✅ RESEND EMAIL API CALL COMPLETED\n`);
 
           // CREATE LEAD CHARGE for this provider
           console.log(`💰 Creating lead charge for ${provider.expert_name}...`);
-          const leadCharge = await base44.entities.LeadCharge.create({
+          const leadCharge = await LeadCharge.create({
             provider_email: provider.expert_email,
             provider_name: provider.expert_name,
             maintenance_task_id: selectedProject.id,
@@ -505,19 +517,19 @@ This is an automated notification from HomeXrei.`;
           console.log(`✅ Lead charge created: $${DEFAULT_LEAD_FEE}`);
 
           // Update provider settings (total leads and billing)
-          const providerSettings = await base44.entities.ProviderSettings.filter({ 
+          const providerSettings = await ProviderSettings.filter({ 
             provider_email: provider.expert_email 
           });
           
           if (providerSettings.length > 0) {
             const settings = providerSettings[0];
-            await base44.entities.ProviderSettings.update(settings.id, {
+            await ProviderSettings.update(settings.id, {
               total_leads_received: (settings.total_leads_received || 0) + 1,
               total_amount_billed: (settings.total_amount_billed || 0) + DEFAULT_LEAD_FEE
             });
           } else {
             // Create new provider settings
-            await base44.entities.ProviderSettings.create({
+            await ProviderSettings.create({
               provider_email: provider.expert_email,
               total_leads_received: 1,
               total_amount_billed: DEFAULT_LEAD_FEE,
@@ -610,7 +622,7 @@ This is an automated notification from HomeXrei.`;
 </html>
         `;
 
-        await base44.integrations.Resend.SendEmail({
+        await sendEmail({
           to: user.email,
           subject: `Confirmation - Project Notifications Sent`,
           html: ownerHtmlEmail,
@@ -642,7 +654,7 @@ HomeXrei Team`,
       }
 
       // Update project
-      await base44.entities.MaintenanceTask.update(selectedProject.id, {
+      await MaintenanceTask.update(selectedProject.id, {
         sent_to_providers: relevantProviders.map(p => p.expert_email)
       });
 

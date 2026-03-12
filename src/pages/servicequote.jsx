@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getUserByBusinessName, getUserByEmail } from '@/api/functions';
+import { InvokeLLM, SendEmail } from '@/api/integrations';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -43,10 +44,10 @@ export default function ServiceQuote() {
     queryKey: ['user', businessName, userEmail],
     queryFn: async () => {
       if (userEmail) {
-        const result = await base44.functions.invoke('getUserByEmail', { email: userEmail });
+        const result = await getUserByEmail({ email: userEmail });
         return result.data;
       } else if (businessName) {
-        const result = await base44.functions.invoke('getUserByBusinessName', { businessName });
+        const result = await getUserByBusinessName({ businessName });
         return result.data;
       }
       return null;
@@ -102,7 +103,7 @@ INSTRUCTIONS:
 
 Generate your SHORT response (1-2 sentences):`;
 
-      const response = await base44.integrations.Core.InvokeLLM({
+      const response = await InvokeLLM({
         prompt,
         add_context_from_internet: false
       });
@@ -170,7 +171,7 @@ Generate your SHORT response (1-2 sentences):`;
       }).join('');
 
       // Send email to business owner
-      await base44.integrations.Core.SendEmail({
+      await SendEmail({
         to: user.email,
         subject: `🔔 New Quote Request from ${leadForm.name}`,
         body: `
@@ -225,7 +226,7 @@ Generate your SHORT response (1-2 sentences):`;
       // Send confirmation email to customer
       const businessLogo = user.business_photo_url ? `<img src="${user.business_photo_url}" alt="${user.business_name}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px; margin-bottom: 15px;">` : '';
       
-      await base44.integrations.Core.SendEmail({
+      await SendEmail({
         to: leadForm.email,
         subject: `✓ Quote Request Received - ${user.business_name}`,
         body: `

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
-import { hasAuthenticatedUser, redirectToAppLogin } from '@/api/base44Client';
+import { hasAuthenticatedUser, redirectToAppLogin } from '@/api/client';
 import { Category, PendingUser, Property } from '@/api/entities';
 import { getLocationFromIP, searchGooglePlaces } from '@/api/functions';
 import { InvokeLLM, UploadFile } from '@/api/integrations';

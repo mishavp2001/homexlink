@@ -2,7 +2,7 @@ export const isPublic = true;
 
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { getCurrentUserProfile } from '@/api/base44Client';
+import { getCurrentUserProfile } from '@/api/client';
 import { Deal } from '@/api/entities';
 import { useQuery } from '@tanstack/react-query';
 import DealDetailsModal from '../components/Deals/DealDetailsModal';

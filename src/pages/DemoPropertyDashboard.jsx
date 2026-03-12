@@ -8,7 +8,7 @@ import { Home, Wrench, DollarSign, FileText, TrendingUp, AlertTriangle, Calendar
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import Navigation from '../components/Navigation';
-import { redirectToAppLogin } from '@/api/base44Client';
+import { redirectToAppLogin } from '@/api/client';
 
 export const isPublic = true;
 

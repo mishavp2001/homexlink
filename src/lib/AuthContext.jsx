@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { getCurrentUserProfile, logoutCurrentUser } from '@/api/base44Client';
+import { getCurrentUserProfile, logoutCurrentUser } from '@/api/client';
 import { buildLoginUrl } from '@/lib/login-route';
 import { restorePostLoginRedirect } from '@/utils/mobileAuth';
 

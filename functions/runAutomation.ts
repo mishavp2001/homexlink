@@ -9,7 +9,7 @@ Deno.serve(async (req) => {
       throw new HttpError(403, 'Admin access required');
     }
 
-    const appUrl = Deno.env.get('APP_URL') || 'https://homexrei.base44.com';
+    const appUrl = Deno.env.get('APP_URL') || 'https://homexrei.com';
     const logs = [];
 
     const log = (message) => {
@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
 
       // 5. First Login - mishavp2001@yahoo.com
       log('Navigating to sign in (first user)...');
-      await page.goto(`${appUrl}/auth/login`, { waitUntil: 'networkidle0', timeout: 30000 });
+      await page.goto(`${appUrl}/login`, { waitUntil: 'networkidle0', timeout: 30000 });
       await waitForNav(2000);
       log('Sign in page loaded');
 
@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
 
       // 7. Second Login - funolympics2@gmail.com
       log('Navigating to sign in (second user)...');
-      await page.goto(`${appUrl}/auth/login`, { waitUntil: 'networkidle0', timeout: 30000 });
+      await page.goto(`${appUrl}/login`, { waitUntil: 'networkidle0', timeout: 30000 });
       await waitForNav(2000);
       log('Sign in page loaded');
 

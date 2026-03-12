@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { base44, getCurrentUserProfile, redirectToAppLogin } from '@/api/base44Client';
+import { getCurrentUserProfile, redirectToAppLogin } from '@/api/client';
+import { Booking, Deal, Message, Offer, SavedDeal } from '@/api/entities';
+import { generatePropertyVideo } from '@/api/functions';
+import { InvokeLLM, SendEmail, UploadFile } from '@/api/integrations';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -160,11 +163,11 @@ export default function PropertyLanding() {
     queryFn: async () => {
       if (dealId) {
         // Search by ID
-        const deals = await base44.entities.Deal.filter({ id: dealId });
+        const deals = await Deal.filter({ id: dealId });
         return deals[0];
       } else if (address) {
         // Search by address and deal type
-        const deals = await base44.entities.Deal.filter({
+        const deals = await Deal.filter({
           location: decodeURIComponent(address),
           deal_type: dealType,
           status: 'active'
@@ -235,7 +238,7 @@ export default function PropertyLanding() {
   };
 
   const createBookingMutation = useMutation({
-    mutationFn: (data) => base44.entities.Booking.create(data),
+    mutationFn: (data) => Booking.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries(['bookings']); // Invalidate cache for bookings
       setBookingSuccess(true);
@@ -261,7 +264,7 @@ export default function PropertyLanding() {
   });
 
   const createServiceDealBookingMutation = useMutation({
-    mutationFn: (data) => base44.entities.Booking.create(data),
+    mutationFn: (data) => Booking.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries(['bookings']);
       setServiceDealBookingSuccess(true);
@@ -291,7 +294,7 @@ export default function PropertyLanding() {
         console.log('=== CREATING OFFER ===');
 
         // 1. Create offer record
-        const offer = await base44.entities.Offer.create(offerData);
+        const offer = await Offer.create(offerData);
         console.log('✅ Offer created:', offer.id);
 
         // 2. Send email to property owner
@@ -323,7 +326,7 @@ This is an automated message from HomeXREI.
 `;
 
         console.log('Sending email to property owner...');
-        await base44.integrations.Core.SendEmail({
+        await SendEmail({
           to: deal.user_email,
           subject: emailSubject,
           body: emailBody
@@ -332,7 +335,7 @@ This is an automated message from HomeXREI.
 
         // 3. Send in-app message
         console.log('Creating in-app message...');
-        await base44.entities.Message.create({
+        await Message.create({
           sender_email: currentUser.email,
           sender_name: offerData.buyer_name,
           recipient_email: deal.user_email,
@@ -483,7 +486,7 @@ This is an automated message from HomeXREI.
       console.log('=== BOOKING REQUEST DEBUG ===');
 
       // 1. Create booking record
-      const newBooking = await base44.entities.Booking.create(bookingPayload);
+      const newBooking = await Booking.create(bookingPayload);
       console.log('✅ Booking created:', newBooking.id);
 
       // 2. Create link to booking request
@@ -531,7 +534,7 @@ This is an automated message from HomeXREI.
 
       // 4. Send in-app message - CRITICAL FIX
       try {
-        const message = await base44.entities.Message.create({
+        const message = await Message.create({
           sender_email: currentUser.email,
           sender_name: bookingData.renter_name || currentUser.full_name,
           recipient_email: deal.user_email,
@@ -553,7 +556,7 @@ This is an automated message from HomeXREI.
 
       // 5. Send email notification
       try {
-        await base44.integrations.Core.SendEmail({
+        await SendEmail({
           to: deal.user_email,
           subject: messageSubject,
           body: messageBody
@@ -657,7 +660,7 @@ This is an automated message from HomeXREI.
 
     try {
       console.log('=== SERVICE DEAL BOOKING REQUEST ===');
-      const newBooking = await base44.entities.Booking.create(bookingPayload);
+      const newBooking = await Booking.create(bookingPayload);
       console.log('✅ Booking created:', newBooking.id);
 
       const bookingRequestUrl = `${window.location.origin}/dashboard`;
@@ -685,7 +688,7 @@ This is an automated message from HomeXREI.
 
       // Send in-app message
       try {
-        await base44.entities.Message.create({
+        await Message.create({
           sender_email: currentUser.email,
           sender_name: serviceDealBookingData.renter_name || currentUser.full_name,
           recipient_email: deal.user_email,
@@ -704,7 +707,7 @@ This is an automated message from HomeXREI.
 
       // Send email
       try {
-        await base44.integrations.Core.SendEmail({
+        await SendEmail({
           to: deal.user_email,
           subject: messageSubject,
           body: messageBody
@@ -758,9 +761,9 @@ This is an automated message from HomeXREI.
       const blob = await response.blob();
       const file = new File([blob], 'qr-code.png', { type: 'image/png' });
 
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await UploadFile({ file });
 
-      await base44.entities.Deal.update(deal.id, {
+      await Deal.update(deal.id, {
         qr_code_url: file_url
       });
 
@@ -794,7 +797,7 @@ This is an automated message from HomeXREI.
     try {
       console.log('🎬 Starting video generation for deal:', deal.id);
 
-      const response = await base44.functions.invoke('generatePropertyVideo', {
+      const response = await generatePropertyVideo({
         dealId: deal.id
       });
 
@@ -818,7 +821,7 @@ This is an automated message from HomeXREI.
   const handleContactSubmit = async (e) => {
     e.preventDefault();
     try {
-      await base44.integrations.Core.SendEmail({
+      await SendEmail({
         to: deal.contact_email || deal.user_email,
         subject: `${dealType === 'sale' ? 'Property Sale' : dealType === 'long_term_rent' ? 'Rental' : 'Vacation Rental'} Inquiry - ${deal.location}`,
         body: `New inquiry for ${deal.title}
@@ -845,7 +848,7 @@ Listing: ${window.location.href}`
   const handleAppointmentSubmit = async (e) => {
     e.preventDefault();
     try {
-      await base44.integrations.Core.SendEmail({
+      await SendEmail({
         to: deal.contact_email || deal.user_email,
         subject: `${dealType === 'sale' ? 'Viewing' : 'Tour'} Request - ${deal.location}`,
         body: `New ${dealType === 'sale' ? 'property viewing' : 'tour'} request for ${deal.title}
@@ -877,7 +880,7 @@ Listing: ${window.location.href}`
 
     setGeneratingDescription(true);
     try {
-      const result = await base44.integrations.Core.InvokeLLM({
+      const result = await InvokeLLM({
         prompt: `Create a compelling, detailed property description for this ${dealType === 'sale' ? 'home for sale' : dealType === 'long_term_rent' ? 'rental property' : 'vacation rental'}:
 
 Title: ${deal.title}
@@ -901,7 +904,7 @@ Format the output as HTML paragraphs (e.g., <p>...</p><p>...</p>) to ensure prop
         // Assuming the LLM returns the description as a string directly based on the outline
       });
 
-      await base44.entities.Deal.update(deal.id, {
+      await Deal.update(deal.id, {
         description: result
       });
 
@@ -926,14 +929,14 @@ Format the output as HTML paragraphs (e.g., <p>...</p><p>...</p>) to ensure prop
   // Check if deal is saved by current user
   const { data: savedDeals = [] } = useQuery({
     queryKey: ['savedDeals', currentUser?.email, dealId],
-    queryFn: () => currentUser ? base44.entities.SavedDeal.filter({ user_email: currentUser.email, deal_id: dealId }) : [],
+    queryFn: () => currentUser ? SavedDeal.filter({ user_email: currentUser.email, deal_id: dealId }) : [],
     enabled: !!currentUser && !!dealId
   });
 
   const isSaved = savedDeals.length > 0;
 
   const saveDealMutation = useMutation({
-    mutationFn: (data) => base44.entities.SavedDeal.create(data),
+    mutationFn: (data) => SavedDeal.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries(['savedDeals']);
       alert('Deal saved successfully! View it in your Dashboard.'); // Added alert
@@ -945,7 +948,7 @@ Format the output as HTML paragraphs (e.g., <p>...</p><p>...</p>) to ensure prop
   });
 
   const unsaveDealMutation = useMutation({
-    mutationFn: (id) => base44.entities.SavedDeal.delete(id),
+    mutationFn: (id) => SavedDeal.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['savedDeals']);
       alert('Deal unsaved.'); // Added alert
