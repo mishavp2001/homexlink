@@ -156,3 +156,189 @@ button:focus-visible {
     @apply bg-background text-foreground;
   }
 }
+
+.login-authenticator [data-amplify-container],
+.login-authenticator [data-amplify-router],
+.login-authenticator [data-amplify-router-content],
+.login-authenticator [role='tabpanel'] {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0;
+  width: 100%;
+}
+
+.login-authenticator,
+.login-authenticator-shell,
+.login-authenticator * {
+  box-sizing: border-box;
+}
+
+.login-authenticator [role='tablist'] {
+  display: none;
+}
+
+.login-authenticator [data-amplify-form] {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
+}
+
+.login-authenticator .federated-sign-in-container {
+  gap: 0.75rem;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0 0 1rem;
+  width: 100%;
+}
+
+.login-authenticator .federated-sign-in-button {
+  width: 100%;
+  max-width: 100%;
+  min-height: 3.25rem;
+  justify-content: flex-start;
+  border: 1px solid #dbe5f1;
+  border-radius: 0.95rem;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  color: #0f172a;
+  font-weight: 500;
+  padding: 0 1rem;
+}
+
+.login-authenticator .federated-sign-in-button:hover {
+  background: #f8fafc;
+}
+
+.login-authenticator .federated-sign-in-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+}
+
+.login-authenticator .amplify-divider {
+  margin: 0.1rem 0;
+}
+
+.login-authenticator .amplify-divider__label {
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.login-authenticator .amplify-field {
+  gap: 0.45rem;
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
+}
+
+.login-authenticator .amplify-label {
+  color: #334155;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.login-authenticator .amplify-field-group {
+  border: 1px solid #dbe5f1;
+  border-radius: 0.95rem;
+  background: #fff;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
+}
+
+.login-authenticator .amplify-field-group:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+}
+
+.login-authenticator .amplify-input,
+.login-authenticator .amplify-field-group input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 3.25rem;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #0f172a;
+  padding: 0 1rem;
+}
+
+.login-authenticator .amplify-input::placeholder,
+.login-authenticator .amplify-field-group input::placeholder {
+  color: #94a3b8;
+}
+
+.login-authenticator .amplify-field-group__outer-end .amplify-button {
+  min-height: auto;
+  width: auto;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: #64748b;
+  padding: 0.75rem 0.9rem;
+}
+
+.login-authenticator .amplify-button--primary {
+  width: 100%;
+  min-height: 3.25rem;
+  border: 0;
+  border-radius: 0.95rem;
+  background: linear-gradient(135deg, #153a63 0%, #245b92 100%);
+  box-shadow: 0 22px 35px -24px rgba(21, 58, 99, 0.85);
+  color: #fff;
+  font-weight: 600;
+}
+
+.login-authenticator .amplify-button--primary:hover {
+  filter: brightness(1.04);
+}
+
+.login-authenticator .amplify-button--primary + [data-amplify-footer] {
+  margin-top: 0.75rem;
+}
+
+.login-authenticator .amplify-button--link {
+  width: auto;
+  min-height: auto;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: #2563eb;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0;
+}
+
+.login-authenticator [data-amplify-footer] {
+  margin-top: 0.5rem;
+}
+
+.login-authenticator .amplify-alert {
+  border-radius: 0.95rem;
+}
+
+.login-authenticator .amplify-field__error-message,
+.login-authenticator [data-amplify-sign-up-errors] {
+  font-size: 0.75rem;
+}
+
+.login-authenticator h3 {
+  color: #0f172a;
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.75rem;
+  text-align: center;
+}

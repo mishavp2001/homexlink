@@ -110,6 +110,27 @@ const mapOAuthProviders = value => {
   return [...new Set(values.map(mapOAuthProvider).filter(Boolean))];
 };
 
+/** @typedef {'google' | 'facebook' | 'amazon' | 'apple'} AuthenticatorSocialProvider */
+
+/** @param {string} value */
+const mapSocialProviderForAuthenticator = value => {
+  switch (String(value || '').trim()) {
+    case 'Google':
+      return 'google';
+    case 'Facebook':
+      return 'facebook';
+    case 'Amazon':
+      return 'amazon';
+    case 'Apple':
+      return 'apple';
+    default:
+      return null;
+  }
+};
+
+/** @param {AuthenticatorSocialProvider | null} value */
+const isAuthenticatorSocialProvider = value => value !== null;
+
 const importMeta = /** @type {{ env?: Record<string, string | undefined> }} */ (/** @type {unknown} */ (import.meta));
 const env = /** @type {Record<string, string | undefined>} */ (importMeta.env || {});
 
@@ -159,11 +180,21 @@ export const isAmplifyRuntimeEnabled = Boolean(
     amplifyRuntimeConfig.graphqlEndpoint,
 );
 
-const hasAmplifyOauthConfig = Boolean(
+export const hasAmplifyOauthConfig = Boolean(
   isAmplifyRuntimeEnabled &&
     amplifyRuntimeConfig.oauthDomain &&
     amplifyRuntimeConfig.redirectSignIn.length &&
     amplifyRuntimeConfig.redirectSignOut.length,
+);
+
+const DEFAULT_SOCIAL_PROVIDERS = ['Google', 'Facebook', 'Apple'];
+
+export const amplifySocialProviders = /** @type {AuthenticatorSocialProvider[]} */ (
+  hasAmplifyOauthConfig
+    ? [...new Set((amplifyRuntimeConfig.oauthProviders.length ? amplifyRuntimeConfig.oauthProviders : DEFAULT_SOCIAL_PROVIDERS)
+        .map(mapSocialProviderForAuthenticator)
+        .filter(isAuthenticatorSocialProvider))]
+    : []
 );
 
 const buildAmplifyConfig = () => {
