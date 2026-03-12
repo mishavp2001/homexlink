@@ -12,11 +12,31 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Edit2, Trash2, Shield, Loader2, AlertTriangle, CheckCircle, XCircle, Video, Play, Search, ArrowUpDown } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
+import { getCategoryImportKey, parseCategoryCsvText } from '@/lib/categoryCsvImport';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import SettingsTab from '../components/Admin/SettingsTab';
 import BusinessClaimTab from '../components/Admin/BusinessClaimTab';
 import SEOTab from '../components/Admin/SEOTab';
+
+const EMPTY_CATEGORY_FORM = {
+  name: '',
+  type: 'service_type',
+  description: '',
+  icon: '',
+  is_active: true,
+};
+
+const CATEGORY_COMPARISON_FIELDS = ['type', 'name', 'description', 'icon', 'is_active', 'sort_order'];
+
+const hasCategoryChanges = (existingCategory, nextData) => CATEGORY_COMPARISON_FIELDS.some(field => {
+  if (!Object.prototype.hasOwnProperty.call(nextData, field)) {
+    return false;
+  }
+
+  return (existingCategory[field] ?? null) !== (nextData[field] ?? null);
+});
 
 export default function Admin() {
   const queryClient = useQueryClient();
@@ -24,18 +44,17 @@ export default function Admin() {
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
-  const [categoryForm, setCategoryForm] = useState({
-    name: '',
-    type: 'service_type',
-    description: '',
-    icon: '',
-    is_active: true
-  });
+  const [categoryForm, setCategoryForm] = useState(EMPTY_CATEGORY_FORM);
   const [automationLogs, setAutomationLogs] = useState([]);
   const [runningAutomation, setRunningAutomation] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
   const [categoryTypeFilter, setCategoryTypeFilter] = useState('all');
   const [categorySortBy, setCategorySortBy] = useState('name');
+  const [categoryImportText, setCategoryImportText] = useState('');
+  const [categoryImportFileName, setCategoryImportFileName] = useState('');
+  const [categoryImportInputKey, setCategoryImportInputKey] = useState(0);
+  const [categoryImportSummary, setCategoryImportSummary] = useState(null);
+  const [importingCategories, setImportingCategories] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -73,7 +92,7 @@ export default function Admin() {
     onSuccess: () => {
       queryClient.invalidateQueries(['categories']);
       setShowCategoryForm(false);
-      setCategoryForm({ name: '', type: 'service_type', description: '', icon: '', is_active: true });
+      setCategoryForm(EMPTY_CATEGORY_FORM);
     }
   });
 
@@ -82,7 +101,7 @@ export default function Admin() {
     onSuccess: () => {
       queryClient.invalidateQueries(['categories']);
       setEditingCategory(null);
-      setCategoryForm({ name: '', type: 'service_type', description: '', icon: '', is_active: true });
+      setCategoryForm(EMPTY_CATEGORY_FORM);
     }
   });
 
@@ -120,6 +139,143 @@ export default function Admin() {
     setEditingCategory(category);
     setCategoryForm(category);
     setShowCategoryForm(true);
+  };
+
+  const resetCategoryImport = () => {
+    setCategoryImportText('');
+    setCategoryImportFileName('');
+    setCategoryImportSummary(null);
+    setCategoryImportInputKey(value => value + 1);
+  };
+
+  const handleCategoryCsvFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      setCategoryImportText(text);
+      setCategoryImportFileName(file.name);
+      setCategoryImportSummary(null);
+      toast({
+        title: 'CSV loaded',
+        description: `Loaded ${file.name}. Review it and click Import CSV when ready.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Unable to read CSV',
+        description: error.message,
+      });
+    }
+  };
+
+  const handleImportCategories = async () => {
+    if (!categoryImportText.trim()) {
+      toast({
+        title: 'No CSV provided',
+        description: 'Upload a CSV file or paste CSV content before importing.',
+      });
+      return;
+    }
+
+    const parsed = parseCategoryCsvText(categoryImportText);
+    const seenKeys = new Set();
+    const duplicateErrors = [];
+
+    parsed.rows.forEach(row => {
+      if (seenKeys.has(row.key)) {
+        duplicateErrors.push(`Row ${row.csvRowNumber}: duplicate category for ${row.data.type} / ${row.data.name}.`);
+        return;
+      }
+
+      seenKeys.add(row.key);
+    });
+
+    const parseErrors = [...parsed.errors, ...duplicateErrors];
+    if (parseErrors.length > 0) {
+      setCategoryImportSummary({
+        totalRows: parsed.rows.length,
+        createdCount: 0,
+        updatedCount: 0,
+        skippedCount: 0,
+        errorMessages: parseErrors,
+      });
+      toast({
+        title: 'CSV validation failed',
+        description: `Fix ${parseErrors.length} issue(s) before importing categories.`,
+      });
+      return;
+    }
+
+    const existingByKey = new Map(categories.map(category => [getCategoryImportKey(category), category]));
+    let createdCount = 0;
+    let updatedCount = 0;
+    let skippedCount = 0;
+    const errorMessages = [];
+
+    setImportingCategories(true);
+
+    try {
+      for (const row of parsed.rows) {
+        const existingCategory = existingByKey.get(row.key);
+
+        if (existingCategory) {
+          const updateData = { ...row.data };
+          delete updateData.id;
+
+          if (!hasCategoryChanges(existingCategory, updateData)) {
+            skippedCount += 1;
+            continue;
+          }
+
+          try {
+            await Category.update(existingCategory.id, updateData);
+            updatedCount += 1;
+          } catch (error) {
+            errorMessages.push(`Row ${row.csvRowNumber}: failed to update ${row.data.name} (${error.message}).`);
+          }
+
+          continue;
+        }
+
+        try {
+          await Category.create(row.data);
+          createdCount += 1;
+        } catch (error) {
+          errorMessages.push(`Row ${row.csvRowNumber}: failed to create ${row.data.name} (${error.message}).`);
+        }
+      }
+
+      await queryClient.invalidateQueries(['categories']);
+
+      setCategoryImportSummary({
+        totalRows: parsed.rows.length,
+        createdCount,
+        updatedCount,
+        skippedCount,
+        errorMessages,
+      });
+
+      if (errorMessages.length > 0) {
+        toast({
+          title: 'Category import finished with errors',
+          description: `Created ${createdCount}, updated ${updatedCount}, skipped ${skippedCount}, errors ${errorMessages.length}.`,
+        });
+        return;
+      }
+
+      setCategoryImportText('');
+      setCategoryImportFileName('');
+      setCategoryImportInputKey(value => value + 1);
+      toast({
+        title: 'Category import complete',
+        description: `Created ${createdCount}, updated ${updatedCount}, skipped ${skippedCount}.`,
+      });
+    } finally {
+      setImportingCategories(false);
+    }
   };
 
   const runAutomation = async () => {
@@ -231,6 +387,101 @@ export default function Admin() {
                 </Button>
               </div>
 
+              <Card className="p-6 mb-6 bg-gray-50 border-dashed">
+                <div className="flex flex-col gap-4">
+                  <div>
+                    <h3 className="font-semibold text-[#1e3a5f] mb-1">Import Categories from CSV</h3>
+                    <p className="text-sm text-gray-600">
+                      Required columns: <span className="font-medium">name</span>, <span className="font-medium">type</span>. Optional: id, description, icon, is_active, sort_order.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+                    <div className="space-y-2">
+                      <Label htmlFor="category-csv-file">CSV file</Label>
+                      <Input
+                        key={categoryImportInputKey}
+                        id="category-csv-file"
+                        type="file"
+                        accept=".csv,text/csv"
+                        onChange={handleCategoryCsvFileChange}
+                        disabled={importingCategories}
+                      />
+                      {categoryImportFileName && (
+                        <p className="text-xs text-gray-500">Loaded file: {categoryImportFileName}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="category-csv-text">CSV content</Label>
+                      <Textarea
+                        id="category-csv-text"
+                        value={categoryImportText}
+                        onChange={(event) => {
+                          setCategoryImportText(event.target.value);
+                          setCategoryImportSummary(null);
+                        }}
+                        placeholder="id,name,type,description,icon,is_active,sort_order"
+                        rows={8}
+                        disabled={importingCategories}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      onClick={handleImportCategories}
+                      disabled={importingCategories || !categoryImportText.trim()}
+                      className="bg-[#1e3a5f] hover:bg-[#2a4a7f]"
+                    >
+                      {importingCategories ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Importing...
+                        </>
+                      ) : (
+                        'Import CSV'
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={resetCategoryImport}
+                      disabled={importingCategories}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+
+                  {categoryImportSummary && (
+                    <div className="rounded-lg border bg-white p-4">
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        <Badge variant="outline">Rows {categoryImportSummary.totalRows}</Badge>
+                        <Badge className="bg-green-100 text-green-800">Created {categoryImportSummary.createdCount}</Badge>
+                        <Badge className="bg-blue-100 text-blue-800">Updated {categoryImportSummary.updatedCount}</Badge>
+                        <Badge className="bg-gray-100 text-gray-800">Skipped {categoryImportSummary.skippedCount}</Badge>
+                        <Badge className={categoryImportSummary.errorMessages.length ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}>
+                          Errors {categoryImportSummary.errorMessages.length}
+                        </Badge>
+                      </div>
+
+                      {categoryImportSummary.errorMessages.length > 0 && (
+                        <div className="space-y-1 text-sm text-red-700">
+                          {categoryImportSummary.errorMessages.slice(0, 8).map((message) => (
+                            <p key={message}>• {message}</p>
+                          ))}
+                          {categoryImportSummary.errorMessages.length > 8 && (
+                            <p className="text-xs text-gray-500">
+                              + {categoryImportSummary.errorMessages.length - 8} more error(s)
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </Card>
+
               {/* Search and Filter Controls */}
               <div className="mb-6 flex flex-col md:flex-row gap-4">
                 <div className="flex-1 relative">
@@ -334,7 +585,7 @@ export default function Admin() {
                         onClick={() => {
                           setShowCategoryForm(false);
                           setEditingCategory(null);
-                          setCategoryForm({ name: '', type: 'service_type', description: '', icon: '', is_active: true });
+                          setCategoryForm(EMPTY_CATEGORY_FORM);
                         }}
                       >
                         Cancel
