@@ -1,5 +1,7 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
 
+import { searchGooglePlacesFunction } from '../functions/search-google-places/resource';
+
 const schema = a.schema({
   AppRole: a.enum(['member', 'admin']),
   UserType: a.enum(['homeowner', 'service_provider', 'first_time_buyer', 'guest']),
@@ -13,6 +15,22 @@ const schema = a.schema({
   LeadChargeStatus: a.enum(['pending', 'paid', 'disputed', 'waived']),
   ReviewStatus: a.enum(['published', 'hidden', 'flagged']),
   MessageReferenceType: a.enum(['deal', 'service', 'booking', 'offer', 'system']),
+
+  GooglePlace: a.customType({
+    place_id: a.string(),
+    name: a.string(),
+    address: a.string(),
+    phone: a.string(),
+    website: a.string(),
+    types: a.string().array(),
+    rating: a.float(),
+    user_ratings_total: a.integer(),
+    photo_url: a.string(),
+  }),
+
+  SearchGooglePlacesResponse: a.customType({
+    places: a.ref('GooglePlace').array().required(),
+  }),
 
   UserProfile: a.model({
     email: a.email().required(),
@@ -319,6 +337,16 @@ const schema = a.schema({
     is_auto_generated: a.boolean().default(false),
     last_generated_date: a.datetime(),
   }).authorization(allow => [allow.publicApiKey().to(['read']), allow.group('ADMINS')]),
+
+  searchGooglePlaces: a
+    .query()
+    .arguments({
+      query: a.string().required(),
+      location: a.string(),
+    })
+    .returns(a.ref('SearchGooglePlacesResponse'))
+    .authorization(allow => [allow.publicApiKey(), allow.authenticated()])
+    .handler(a.handler.function(searchGooglePlacesFunction)),
 });
 
 export type Schema = ClientSchema<typeof schema>;

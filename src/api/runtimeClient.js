@@ -896,6 +896,18 @@ const normalizeRecord = (modelName, record) => {
 
   const normalized = { ...record };
 
+  const parseMaybeJsonValue = value => {
+    if (typeof value !== 'string') {
+      return value;
+    }
+
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  };
+
   if (record.createdAt && !normalized.created_date) {
     normalized.created_date = record.createdAt;
   }
@@ -915,6 +927,9 @@ const normalizeRecord = (modelName, record) => {
     if (typeof normalized.certifications === 'string') {
       normalized.certifications = normalized.certifications ? [normalized.certifications] : [];
     }
+    normalized.price_list = parseMaybeJsonValue(normalized.price_list);
+    normalized.work_photos = parseMaybeJsonValue(normalized.work_photos);
+    normalized.social_links = parseMaybeJsonValue(normalized.social_links);
   } else if (modelName === 'Booking') {
     const { text: unpackedMessage, metadata } = splitLegacyMetadataText(normalized.message);
     normalized.message = unpackedMessage;
@@ -1233,6 +1248,24 @@ const buildDeleteMutation = definition => `
   }
 `;
 
+const SEARCH_GOOGLE_PLACES_QUERY = `
+  query SearchGooglePlaces($query: String!, $location: String) {
+    searchGooglePlaces(query: $query, location: $location) {
+      places {
+        place_id
+        name
+        address
+        phone
+        website
+        types
+        rating
+        user_ratings_total
+        photo_url
+      }
+    }
+  }
+`;
+
 const extractGraphQLData = (payload, operationName) => {
   if (payload?.errors?.length) {
     const [firstError] = payload.errors;
@@ -1280,6 +1313,19 @@ const getReadAuthMode = async definition => {
   return null;
 };
 
+const getSearchGooglePlacesAuthMode = async () => {
+  const session = await getAmplifySession();
+  if (session) {
+    return 'userPool';
+  }
+
+  if (amplifyRuntimeConfig.apiKey) {
+    return 'apiKey';
+  }
+
+  return null;
+};
+
 const canUseAmplifyEntity = async (definition, operation) => {
   if (!isAmplifyRuntimeEnabled || !definition) {
     return false;
@@ -1303,6 +1349,259 @@ const shouldUseAmplifyEntityOperation = async (definition, operation) => {
 const graphql = async ({ query, variables, authMode, operationName }) => {
   const payload = await getGraphQLClient().graphql({ query, variables, authMode });
   return extractGraphQLData(payload, operationName);
+};
+
+const buildFunctionResponse = (data, status = 200, statusText = 'OK') => ({
+  data,
+  status,
+  statusText,
+  headers: null,
+});
+
+const buildFunctionError = (message, { status = 500, code, data } = {}) =>
+  normalizeError(message, {
+    status,
+    code,
+    data,
+    response: {
+      status,
+      data,
+    },
+  });
+
+const mapServiceListingToPublicProvider = listing => {
+  const normalized = normalizeRecord('ServiceListing', listing) || {};
+
+  return {
+    id: normalized.id,
+    email: normalized.expert_email,
+    expert_email: normalized.expert_email,
+    expert_name: normalized.expert_name,
+    user_type: 'service_provider',
+    profile_type: 'business',
+    bio: normalized.bio,
+    business_name: normalized.business_name,
+    business_photo_url: normalized.business_photo_url,
+    business_phone: normalized.business_phone,
+    business_address: normalized.business_address,
+    service_category: normalized.service_category,
+    service_types: Array.isArray(normalized.service_types) ? normalized.service_types : [],
+    service_areas: Array.isArray(normalized.service_areas) ? normalized.service_areas : [],
+    certifications: Array.isArray(normalized.certifications) ? normalized.certifications : [],
+    years_in_business: normalized.years_in_business,
+    years_experience: normalized.years_experience,
+    hourly_rate: normalized.hourly_rate,
+    website_url: normalized.website_url,
+    google_place_id: normalized.google_place_id,
+    social_links: normalized.social_links,
+    work_photos: normalized.work_photos,
+    price_list: normalized.price_list,
+    quote_assistant_instructions: normalized.quote_assistant_instructions,
+    average_rating: normalized.average_rating ?? 0,
+    review_count: normalized.review_count ?? 0,
+    is_verified: Boolean(normalized.is_verified),
+    status: normalized.status,
+    profile_qr_code_url: normalized.profile_qr_code_url,
+    createdAt: normalized.createdAt,
+    updatedAt: normalized.updatedAt,
+  };
+};
+
+const getServiceListingDefinition = () => {
+  const definition = getModelDefinition('ServiceListing');
+
+  if (!definition) {
+    throw normalizeError('ServiceListing model definition is not available in runtimeClient.');
+  }
+
+  return definition;
+};
+
+const invokeAmplifyGetLocationFromIP = async () => {
+  if (typeof fetch !== 'function') {
+    return buildFunctionResponse({
+      success: true,
+      city: null,
+      region: null,
+      country: null,
+      location: null,
+      lat: null,
+      lon: null,
+      timezone: null,
+      ip: 'unknown',
+    });
+  }
+
+  let response;
+  try {
+    response = await fetch('https://ipapi.co/json/');
+  } catch (error) {
+    const message = error?.message || 'Failed to get location from IP.';
+    throw buildFunctionError(message, {
+      status: 500,
+      data: { error: message },
+    });
+  }
+
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok || payload?.error) {
+    const message = payload?.reason || payload?.error || 'Failed to get location from IP.';
+    throw buildFunctionError(message, {
+      status: response.status || 500,
+      data: payload || { error: message },
+    });
+  }
+
+  const city = typeof payload?.city === 'string' && payload.city ? payload.city : null;
+  const region = typeof payload?.region === 'string' && payload.region ? payload.region : null;
+  const country = typeof payload?.country_name === 'string' && payload.country_name
+    ? payload.country_name
+    : typeof payload?.country === 'string' && payload.country
+      ? payload.country
+      : null;
+
+  return buildFunctionResponse({
+    success: true,
+    city,
+    region,
+    country,
+    location: city ? (region ? `${city}, ${region}` : city) : null,
+    lat: payload?.latitude ?? null,
+    lon: payload?.longitude ?? null,
+    timezone: payload?.timezone ?? null,
+    ip: payload?.ip || 'unknown',
+  });
+};
+
+const invokeAmplifyGetServiceProviders = async () => {
+  const listings = await listModelRecords(getServiceListingDefinition());
+  const serviceProviders = listings
+    .map(mapServiceListingToPublicProvider)
+    .filter(provider => provider.business_name && provider.service_types?.length > 0);
+
+  return buildFunctionResponse(serviceProviders);
+};
+
+const invokeAmplifyGetUserByEmail = async data => {
+  const email = typeof data?.email === 'string' ? data.email.trim() : '';
+  if (!email) {
+    throw buildFunctionError('Email is required', {
+      status: 400,
+      data: { error: 'Email is required' },
+    });
+  }
+
+  const listings = await listModelRecords(getServiceListingDefinition(), {
+    filter: toGraphQLFilter({ expert_email: email }),
+    limit: 1,
+  });
+
+  if (listings.length === 0) {
+    throw buildFunctionError('Profile not found', {
+      status: 404,
+      data: { error: 'Profile not found' },
+    });
+  }
+
+  return buildFunctionResponse(mapServiceListingToPublicProvider(listings[0]));
+};
+
+const invokeAmplifyGetUserByBusinessName = async data => {
+  const businessName = typeof data?.businessName === 'string' ? data.businessName.trim() : '';
+  if (!businessName) {
+    throw buildFunctionError('Business name is required', {
+      status: 400,
+      data: { error: 'Business name is required' },
+    });
+  }
+
+  const listing = (await listModelRecords(getServiceListingDefinition())).find(item =>
+    item?.business_name && String(item.business_name).toLowerCase() === businessName.toLowerCase()
+  );
+
+  if (!listing) {
+    throw buildFunctionError('Business not found', {
+      status: 404,
+      data: { error: 'Business not found' },
+    });
+  }
+
+  return buildFunctionResponse({
+    success: true,
+    ...mapServiceListingToPublicProvider(listing),
+  });
+};
+
+const invokeAmplifySearchGooglePlaces = async data => {
+  if (!isAmplifyRuntimeEnabled) {
+    throw buildFunctionError('The functions.searchGooglePlaces operation is not available because Amplify runtime is not configured.', {
+      status: 503,
+      data: { error: 'Amplify runtime is not configured.' },
+    });
+  }
+
+  const query = typeof data?.query === 'string' ? data.query.trim() : '';
+  if (!query) {
+    throw buildFunctionError('Query is required', {
+      status: 400,
+      data: { error: 'Query is required' },
+    });
+  }
+
+  const authMode = await getSearchGooglePlacesAuthMode();
+  if (!authMode) {
+    throw buildFunctionError('The functions.searchGooglePlaces operation is not available because no Amplify GraphQL auth mode is configured.', {
+      status: 503,
+      data: { error: 'No Amplify GraphQL auth mode is configured for searchGooglePlaces.' },
+    });
+  }
+
+  const responseData = await graphql({
+    query: SEARCH_GOOGLE_PLACES_QUERY,
+    variables: {
+      query,
+      location: data?.location ?? null,
+    },
+    authMode,
+    operationName: 'searchGooglePlaces',
+  });
+
+  return {
+    data: responseData,
+    status: 200,
+    statusText: 'OK',
+    headers: null,
+  };
+};
+
+const invokeFunction = (functionName, data) => {
+  if (functionName === 'getLocationFromIP') {
+    return invokeAmplifyGetLocationFromIP(data);
+  }
+
+  if (functionName === 'getServiceProviders') {
+    return invokeAmplifyGetServiceProviders(data);
+  }
+
+  if (functionName === 'getUserByEmail') {
+    return invokeAmplifyGetUserByEmail(data);
+  }
+
+  if (functionName === 'getUserByBusinessName') {
+    return invokeAmplifyGetUserByBusinessName(data);
+  }
+
+  if (functionName === 'searchGooglePlaces') {
+    return invokeAmplifySearchGooglePlaces(data);
+  }
+
+  return invokeLegacyFunction(functionName, data);
 };
 
 const listModelRecords = async (definition, options = {}) => {
@@ -1657,7 +1956,7 @@ export const entities = new Proxy(
 
 export const functions = new Proxy(
   {
-    invoke: (functionName, data) => invokeLegacyFunction(functionName, data),
+    invoke: (functionName, data) => invokeFunction(functionName, data),
   },
   {
     get(target, property) {
@@ -1669,7 +1968,7 @@ export const functions = new Proxy(
         return undefined;
       }
 
-      return data => invokeLegacyFunction(property, data);
+      return data => invokeFunction(property, data);
     },
   },
 );
